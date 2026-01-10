@@ -384,7 +384,8 @@ body {
 
 /* 학원 액션 버튼 */
 .academy-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     gap: 8px;
     margin-top: 16px;
     padding-top: 16px;
@@ -392,17 +393,17 @@ body {
 }
 
 .btn-action {
-    flex: 1;
-    padding: 10px 16px;
+    padding: 10px 8px;
     border: 2px solid var(--btn-primary);
     border-radius: 8px;
     background: white;
     color: var(--btn-primary);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     font-family: inherit;
+    white-space: nowrap;
 }
 
 .btn-action:hover {
@@ -415,10 +416,23 @@ body {
 .btn-action.btn-primary {
     background: var(--btn-primary);
     color: white;
+    grid-column: span 3; /* 출석체크 버튼만 전체 너비 */
 }
 
 .btn-action.btn-primary:hover {
     background: var(--btn-hover);
+}
+
+/* 모바일에서 버튼 크기 조정 */
+@media (max-width: 380px) {
+    .academy-actions {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+    
+    .btn-action.btn-primary {
+        grid-column: span 1;
+    }
 }
 
 /* 가계부 */
