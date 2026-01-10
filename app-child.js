@@ -1,18 +1,5 @@
 // 학원가자 - 어린이 앱 JavaScript
 
-// ========================================
-// Supabase 초기화
-// ========================================
-
-const SUPABASE_URL = 'https://pvbfblbivboypjsnzmkj.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_7Kt6XwlLQG2xxlO9ABhG3Q_cyN-1i6_';
-
-// Supabase 클라이언트 (전역)
-let supabaseClient;
-if (typeof window.supabase !== 'undefined') {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-}
-
 // Storage (부모 앱과 동일한 데이터 사용)
 const Storage = {
     get(key) {
@@ -27,136 +14,39 @@ const Storage = {
 // 전역 상태
 let currentChildId = null;
 let currentChild = null;
-let familyId = null;
 let mediaRecorder = null;
 let audioChunks = [];
 let recordingStartTime = null;
 let recordingTimer = null;
 
-// ========================================
-// 가족 연결 기능
-// ========================================
-
-// 가족 코드로 연결
-async function connectFamily() {
-    const code = document.getElementById('familyCodeInput').value.trim().toUpperCase();
-    
-    if (code.length !== 6) {
-        alert('6자리 코드를 입력해주세요!');
-        return;
-    }
-    
-    try {
-        // 코드로 가족 찾기
-        const { data: family, error } = await supabaseClient
-            .from('families')
-            .select('*')
-            .eq('code', code)
-            .single();
-        
-        if (error || !family) {
-            alert('❌ 코드를 찾을 수 없어요!\n부모님께 코드를 다시 확인해주세요.');
-            return;
-        }
-        
-        familyId = family.id;
-        Storage.set('familyId', familyId);
-        
-        // 가족의 자녀 목록 가져오기
-        const { data: children, error: childError } = await supabaseClient
-            .from('children')
-            .select('*')
-            .eq('family_id', familyId);
-        
-        if (children && children.length > 0) {
-            // 자녀 선택 모달 표시
-            showChildSelectModal(children);
-        } else {
-            alert('❌ 등록된 자녀가 없어요!\n부모님께 먼저 자녀를 등록해달라고 하세요.');
-        }
-        
-        // 코드 입력 모달 닫기
-        document.getElementById('familyCodeModal').style.display = 'none';
-        
-    } catch (error) {
-        console.error('가족 연결 실패:', error);
-        alert('연결에 실패했어요. 다시 시도해주세요!');
-    }
-}
-
-// 자녀 선택 모달 표시
-function showChildSelectModal(children) {
-    const container = document.getElementById('childSelectList');
-    
-    container.innerHTML = children.map(child => `
-        <button onclick="selectChild('${child.id}')" style="width: 100%; padding: 20px; margin-bottom: 12px; background: linear-gradient(135deg, #87CEEB 0%, #FFB6C1 100%); border: none; border-radius: 16px; color: white; font-size: 18px; font-weight: bold; cursor: pointer;">
-            👤 ${child.name}
-        </button>
-    `).join('');
-    
-    document.getElementById('childSelectModal').style.display = 'flex';
-}
-
-// 자녀 선택
-function selectChild(childId) {
-    currentChildId = childId;
-    Storage.set('currentChildId', childId);
-    Storage.set('familyId', familyId);
-    
-    document.getElementById('childSelectModal').style.display = 'none';
-    
-    // 데이터 로드 및 렌더
+// 초기화
+function init() {
     loadChildData();
     render();
     
-    alert('✅ 연결 완료! 환영합니다! 🎉');
-}
-
-// 초기화
-async function init() {
     // 로딩 화면 숨기기
     setTimeout(() => {
         document.getElementById('loadingScreen').style.display = 'none';
     }, 1000);
-    
-    // 가족 ID 체크
-    familyId = Storage.get('familyId');
-    currentChildId = Storage.get('currentChildId');
-    
-    if (!familyId) {
-        // 가족 코드 입력 모달 표시
-        document.getElementById('familyCodeModal').style.display = 'flex';
-        return;
-    }
-    
-    if (!currentChildId) {
-        // 자녀 선택 필요
-        alert('자녀를 선택해주세요!');
-        document.getElementById('familyCodeModal').style.display = 'flex';
-        return;
-    }
-    
-    loadChildData();
-    render();
 }
 
 // 자녀 데이터 로드
-async function loadChildData() {
-    try {
-        // 자녀 정보 가져오기
-        const { data: child, error: childError } = await supabaseClient
-            .from('children')
-            .select('*')
-            .eq('id', currentChildId)
-            .single();
-        
-        if (childError) throw childError;
-        
-        currentChild = child;
-        
-    } catch (error) {
-        console.error('자녀 데이터 로드 실패:', error);
-        alert('데이터를 불러올 수 없어요!');
+function loadChildData() {
+    // 현재 자녀 ID 가져오기 (부모 앱에서 설정한 것)
+    currentChildId = Storage.get('currentChildId');
+    
+    if (!currentChildId) {
+        alert('먼저 부모 앱에서 자녀를 등록해주세요!');
+        return;
+    }
+    
+    // 자녀 정보
+    const children = Storage.get('children') || [];
+    currentChild = children.find(c => c.id === currentChildId);
+    
+    if (!currentChild) {
+        alert('자녀 정보를 찾을 수 없어요!');
+        return;
     }
 }
 
