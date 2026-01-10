@@ -164,25 +164,6 @@
         </nav>
     </div>
 
-    <!-- 가족 코드 입력 모달 -->
-    <div id="familyCodeModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h2>👨‍👩‍👧 가족 연결</h2>
-            <p style="margin-bottom: 20px; color: #666;">부모님이 알려준 6자리 코드를 입력하세요</p>
-            <input type="text" id="familyCodeInput" placeholder="ABC123" maxlength="6" style="width: 100%; padding: 16px; font-size: 24px; text-align: center; text-transform: uppercase; border: 2px solid #87CEEB; border-radius: 12px; margin-bottom: 20px; letter-spacing: 4px;">
-            <button class="btn btn-primary" onclick="connectFamily()" style="width: 100%; padding: 16px; font-size: 18px;">연결하기</button>
-        </div>
-    </div>
-
-    <!-- 자녀 선택 모달 -->
-    <div id="childSelectModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h2>👤 누구세요?</h2>
-            <p style="margin-bottom: 20px; color: #666;">자녀를 선택하세요</p>
-            <div id="childSelectList"></div>
-        </div>
-    </div>
-
     <!-- 성공 애니메이션 모달 -->
     <div id="successModal" class="success-modal" style="display: none;">
         <div class="success-content">
@@ -192,9 +173,6 @@
         </div>
     </div>
 
-    <!-- Supabase 라이브러리 -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
     <script src="app-child.js"></script>
 </body>
 </html>
