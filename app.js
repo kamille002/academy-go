@@ -27,6 +27,95 @@ let state = {
     }
 };
 
+// PWA 설치 프롬프트
+let deferredPrompt = null;
+let installBannerDismissed = false;
+
+// PWA 설치 감지
+window.addEventListener('beforeinstallprompt', (e) => {
+    // 기본 설치 프롬프트 방지
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // 배너가 이전에 닫혔는지 확인
+    const dismissed = localStorage.getItem('installBannerDismissed');
+    const dismissedDate = localStorage.getItem('installBannerDismissedDate');
+    
+    // 7일 이내에 닫았으면 다시 표시 안 함
+    if (dismissed && dismissedDate) {
+        const daysSince = (Date.now() - parseInt(dismissedDate)) / (1000 * 60 * 60 * 24);
+        if (daysSince < 7) {
+            return;
+        }
+    }
+    
+    // 설치 배너 표시
+    showInstallBanner();
+});
+
+// 설치 배너 표시
+function showInstallBanner() {
+    const banner = document.getElementById('installBanner');
+    if (banner && !installBannerDismissed) {
+        banner.style.display = 'block';
+        
+        // 설치 버튼 클릭 이벤트
+        document.getElementById('installBtn').addEventListener('click', installPWA);
+    }
+}
+
+// PWA 설치 실행
+async function installPWA() {
+    if (!deferredPrompt) {
+        // iOS 사용자를 위한 안내
+        if (isIOS()) {
+            alert('📱 iOS 설치 방법:\n\n1. 하단 공유 버튼 탭\n2. "홈 화면에 추가" 선택\n3. 완료!\n\n이제 앱처럼 사용할 수 있어요! 🎉');
+            closeInstallBanner();
+            return;
+        }
+        return;
+    }
+    
+    // 설치 프롬프트 표시
+    deferredPrompt.prompt();
+    
+    // 사용자 선택 대기
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+        console.log('PWA 설치 완료!');
+    }
+    
+    // 프롬프트 초기화
+    deferredPrompt = null;
+    closeInstallBanner();
+}
+
+// 설치 배너 닫기
+function closeInstallBanner() {
+    const banner = document.getElementById('installBanner');
+    if (banner) {
+        banner.style.display = 'none';
+        installBannerDismissed = true;
+        
+        // 7일간 표시 안 함
+        localStorage.setItem('installBannerDismissed', 'true');
+        localStorage.setItem('installBannerDismissedDate', Date.now().toString());
+    }
+}
+
+// iOS 감지
+function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+// 앱이 이미 설치되었는지 확인
+window.addEventListener('appinstalled', () => {
+    console.log('PWA가 설치되었습니다!');
+    closeInstallBanner();
+    deferredPrompt = null;
+});
+
 // 초기화
 function init() {
     loadData();
@@ -137,6 +226,12 @@ function saveData() {
 // ID 생성
 function generateId() {
     return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// 시간을 분으로 변환 (유효성 검사용)
+function convertTimeToMinutes(timeString) {
+    const [hours, minutes] = timeString.split(':').map(Number);
+    return hours * 60 + minutes;
 }
 
 // 렌더링
@@ -596,6 +691,15 @@ function saveAcademy(event) {
     
     if (selectedDays.length === 0) {
         alert('수업 요일을 최소 1개 이상 선택해주세요!');
+        return;
+    }
+    
+    // 출발 시간 유효성 검사
+    const classTimeMinutes = convertTimeToMinutes(classTime);
+    const departureTimeMinutes = convertTimeToMinutes(departureTime);
+    
+    if (departureTimeMinutes >= classTimeMinutes) {
+        alert('⚠️ 출발 시간이 수업 시작 시간보다 늦거나 같습니다!\n\n출발 시간은 수업 시작 시간보다 앞서야 합니다.\n\n예시:\n- 수업 시간: 16:30\n- 출발 시간: 16:00 ✅\n- 출발 시간: 16:30 ❌\n- 출발 시간: 16:40 ❌');
         return;
     }
     
