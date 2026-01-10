@@ -1091,3 +1091,122 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
 }
+
+/* ========================================
+   PC 레이아웃 & 광고 영역
+======================================== */
+
+/* 기본: 모바일 중심 */
+.desktop-wrapper {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-primary);
+}
+
+.ad-sidebar {
+    display: none; /* 기본적으로 숨김 (모바일) */
+}
+
+.app-wrapper {
+    flex: 1;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* PC 화면 (1200px 이상) */
+@media (min-width: 1200px) {
+    body {
+        background: #E8E8E8;
+    }
+    
+    .desktop-wrapper {
+        justify-content: center;
+        gap: 20px;
+        padding: 20px;
+        background: #E8E8E8;
+    }
+    
+    /* 광고 영역 표시 */
+    .ad-sidebar {
+        display: block;
+        width: 300px;
+        flex-shrink: 0;
+    }
+    
+    .ad-content {
+        position: sticky;
+        top: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .ad-placeholder {
+        background: white;
+        border: 2px dashed #ccc;
+        border-radius: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #999;
+        font-size: 14px;
+        padding: 20px;
+        transition: all 0.3s;
+    }
+    
+    .ad-placeholder:hover {
+        border-color: var(--btn-primary);
+        background: rgba(180, 167, 214, 0.05);
+    }
+    
+    .ad-placeholder.ad-250 {
+        height: 250px;
+    }
+    
+    .ad-placeholder.ad-600 {
+        height: 600px;
+    }
+    
+    .ad-placeholder p {
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+    
+    .ad-placeholder small {
+        font-size: 12px;
+    }
+    
+    /* 메인 앱 영역 */
+    .app-wrapper {
+        max-width: 480px;
+        background: var(--bg-primary);
+        box-shadow: 0 0 40px rgba(0,0,0,0.15);
+        border-radius: 0; /* 모바일 느낌 유지 */
+    }
+}
+
+/* 큰 PC 화면 (1600px 이상) */
+@media (min-width: 1600px) {
+    .ad-sidebar {
+        width: 350px;
+    }
+    
+    .app-wrapper {
+        max-width: 520px;
+    }
+}
+
+/* 태블릿 (768px ~ 1199px) */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .desktop-wrapper {
+        justify-content: center;
+        padding: 20px;
+        background: #F0F0F0;
+    }
+    
+    .app-wrapper {
+        max-width: 600px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+}
