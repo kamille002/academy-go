@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>학원가자 - 어린이</title>
+    <link rel="stylesheet" href="styles-child.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#87CEEB">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon-192.png">
+</head>
+<body>
+    <!-- 로딩 화면 -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-emoji bounce">🎒</div>
+            <h1>학원가자</h1>
+            <div class="loading-dots">
+                <span>●</span>
+                <span>●</span>
+                <span>●</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 메인 앱 -->
+    <div id="app" class="app-container">
+        <!-- 헤더 -->
+        <header class="app-header">
+            <div class="header-wave">
+                <svg viewBox="0 0 1200 120" preserveAspectRatio="none">
+                    <path d="M0,0 C150,80 350,80 600,50 C850,20 1050,80 1200,50 L1200,00 L0,0 Z" fill="#87CEEB"></path>
+                </svg>
+            </div>
+            <div class="header-content">
+                <div class="greeting">
+                    <h1>👋 안녕, <span id="childName">친구</span>!</h1>
+                </div>
+                <div class="stats-card">
+                    <div class="stat-item">
+                        <div class="stat-icon">🏆</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalPoints">0</span>
+                            <span class="stat-label">포인트</span>
+                        </div>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <div class="stat-icon">✨</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="attendanceRate">0</span>
+                            <span class="stat-label">%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 메인 컨텐츠 -->
+        <main class="main-content">
+            <!-- 음성 메시지 섹션 -->
+            <section class="message-section">
+                <h2 class="section-title">💬 부모님께 메시지</h2>
+                
+                <div class="voice-message-card">
+                    <p class="voice-hint">마이크를 꾹 눌러서 녹음해요!</p>
+                    <button class="voice-record-btn" id="voiceRecordBtn" onmousedown="startChildRecording()" onmouseup="stopChildRecording()" ontouchstart="startChildRecording()" ontouchend="stopChildRecording()">
+                        <div class="mic-icon" id="micIcon">🎤</div>
+                        <div class="recording-wave" id="recordingWave" style="display: none;">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <span class="btn-text" id="recordBtnText">눌러서 녹음</span>
+                    </button>
+                    <div class="recording-timer" id="recordingTimer" style="display: none;">
+                        00:00
+                    </div>
+                </div>
+
+                <div class="quick-messages">
+                    <p class="quick-hint">빠른 메시지</p>
+                    <div class="quick-btn-grid">
+                        <button class="quick-btn" onclick="sendQuickMessage('🍗', '치킨 사주세요!')">
+                            <span class="quick-emoji">🍗</span>
+                            <span class="quick-text">치킨!</span>
+                        </button>
+                        <button class="quick-btn" onclick="sendQuickMessage('🍚', '배고파요!')">
+                            <span class="quick-emoji">🍚</span>
+                            <span class="quick-text">배고파</span>
+                        </button>
+                        <button class="quick-btn" onclick="sendQuickMessage('🎮', '게임 30분만!')">
+                            <span class="quick-emoji">🎮</span>
+                            <span class="quick-text">게임</span>
+                        </button>
+                        <button class="quick-btn" onclick="sendQuickMessage('🎁', '선물 주세요!')">
+                            <span class="quick-emoji">🎁</span>
+                            <span class="quick-text">선물</span>
+                        </button>
+                        <button class="quick-btn" onclick="sendQuickMessage('💕', '사랑해요!')">
+                            <span class="quick-emoji">💕</span>
+                            <span class="quick-text">사랑해</span>
+                        </button>
+                        <button class="quick-btn" onclick="sendQuickMessage('📱', '폰 쓰고 싶어요!')">
+                            <span class="quick-emoji">📱</span>
+                            <span class="quick-text">폰</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 보낸 메시지 -->
+                <div class="sent-messages" id="sentMessages" style="display: none;">
+                    <h3 class="sent-title">📬 보낸 메시지</h3>
+                    <div id="messageList"></div>
+                </div>
+            </section>
+
+            <!-- 출석 체크 섹션 -->
+            <section class="attendance-section">
+                <h2 class="section-title">✅ 학원 출석</h2>
+                <div id="academyList" class="academy-list">
+                    <!-- 학원 카드들 -->
+                </div>
+            </section>
+
+            <!-- 보상 섹션 -->
+            <section class="rewards-section">
+                <h2 class="section-title">🎁 내 보상</h2>
+                <div id="rewardsList" class="rewards-list">
+                    <!-- 보상 카드들 -->
+                </div>
+            </section>
+
+            <!-- 엄마 목소리 섹션 -->
+            <section class="parent-voice-section" id="parentVoiceSection" style="display: none;">
+                <h2 class="section-title">🎤 엄마 목소리</h2>
+                <div id="parentVoiceList" class="parent-voice-list">
+                    <!-- 엄마 목소리 버튼들 -->
+                </div>
+            </section>
+        </main>
+
+        <!-- 하단 네비게이션 -->
+        <nav class="bottom-nav">
+            <button class="nav-btn active" onclick="showChildTab('home')">
+                <span class="nav-icon">🏠</span>
+                <span class="nav-label">홈</span>
+            </button>
+            <button class="nav-btn" onclick="showChildTab('academy')">
+                <span class="nav-icon">🏫</span>
+                <span class="nav-label">학원</span>
+            </button>
+            <button class="nav-btn" onclick="showChildTab('rewards')">
+                <span class="nav-icon">🎁</span>
+                <span class="nav-label">보상</span>
+            </button>
+            <button class="nav-btn" onclick="showChildTab('profile')">
+                <span class="nav-icon">👤</span>
+                <span class="nav-label">내정보</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- 가족 코드 입력 모달 -->
+    <div id="familyCodeModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>👨‍👩‍👧 가족 연결</h2>
+            <p style="margin-bottom: 20px; color: #666;">부모님이 알려준 6자리 코드를 입력하세요</p>
+            <input type="text" id="familyCodeInput" placeholder="ABC123" maxlength="6" style="width: 100%; padding: 16px; font-size: 24px; text-align: center; text-transform: uppercase; border: 2px solid #87CEEB; border-radius: 12px; margin-bottom: 20px; letter-spacing: 4px;">
+            <button class="btn btn-primary" onclick="connectFamily()" style="width: 100%; padding: 16px; font-size: 18px;">연결하기</button>
+        </div>
+    </div>
+
+    <!-- 자녀 선택 모달 -->
+    <div id="childSelectModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>👤 누구세요?</h2>
+            <p style="margin-bottom: 20px; color: #666;">자녀를 선택하세요</p>
+            <div id="childSelectList"></div>
+        </div>
+    </div>
+
+    <!-- 성공 애니메이션 모달 -->
+    <div id="successModal" class="success-modal" style="display: none;">
+        <div class="success-content">
+            <div class="success-emoji">🎉</div>
+            <h2 id="successTitle">메시지 전송!</h2>
+            <p id="successMessage">부모님이 곧 확인할 거예요!</p>
+        </div>
+    </div>
+
+    <!-- Supabase 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script src="app-child.js"></script>
+</body>
+</html>
