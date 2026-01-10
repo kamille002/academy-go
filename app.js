@@ -27,113 +27,16 @@ let state = {
     }
 };
 
-// PWA 설치 프롬프트
-let deferredPrompt = null;
-let installBannerDismissed = false;
-
-// PWA 설치 감지
-window.addEventListener('beforeinstallprompt', (e) => {
-    // 기본 설치 프롬프트 방지
-    e.preventDefault();
-    deferredPrompt = e;
-    
-    // 배너가 이전에 닫혔는지 확인
-    const dismissed = localStorage.getItem('installBannerDismissed');
-    const dismissedDate = localStorage.getItem('installBannerDismissedDate');
-    
-    // 7일 이내에 닫았으면 다시 표시 안 함
-    if (dismissed && dismissedDate) {
-        const daysSince = (Date.now() - parseInt(dismissedDate)) / (1000 * 60 * 60 * 24);
-        if (daysSince < 7) {
-            return;
-        }
-    }
-    
-    // 설치 배너 표시
-    showInstallBanner();
-});
-
-// 설치 배너 표시
-function showInstallBanner() {
-    const banner = document.getElementById('installBanner');
-    if (banner && !installBannerDismissed) {
-        banner.style.display = 'block';
-        
-        // 설치 버튼 클릭 이벤트
-        document.getElementById('installBtn').addEventListener('click', installPWA);
-    }
-}
-
-// PWA 설치 실행
-async function installPWA() {
-    if (!deferredPrompt) {
-        // iOS 사용자를 위한 안내
-        if (isIOS()) {
-            alert('📱 iOS 설치 방법:\n\n1. 하단 공유 버튼 탭\n2. "홈 화면에 추가" 선택\n3. 완료!\n\n이제 앱처럼 사용할 수 있어요! 🎉');
-            closeInstallBanner();
-            return;
-        }
-        return;
-    }
-    
-    // 설치 프롬프트 표시
-    deferredPrompt.prompt();
-    
-    // 사용자 선택 대기
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-        console.log('PWA 설치 완료!');
-    }
-    
-    // 프롬프트 초기화
-    deferredPrompt = null;
-    closeInstallBanner();
-}
-
-// 설치 배너 닫기
-function closeInstallBanner() {
-    const banner = document.getElementById('installBanner');
-    if (banner) {
-        banner.style.display = 'none';
-        installBannerDismissed = true;
-        
-        // 7일간 표시 안 함
-        localStorage.setItem('installBannerDismissed', 'true');
-        localStorage.setItem('installBannerDismissedDate', Date.now().toString());
-    }
-}
-
-// iOS 감지
-function isIOS() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-}
-
-// 앱이 이미 설치되었는지 확인
-window.addEventListener('appinstalled', () => {
-    console.log('PWA가 설치되었습니다!');
-    closeInstallBanner();
-    deferredPrompt = null;
-});
-
 // 초기화
 function init() {
-    try {
-        loadData();
-        checkPaymentAlerts();
-        render();
-    } catch (error) {
-        console.error('초기화 오류:', error);
-        // 오류가 있어도 기본 화면은 표시
-    }
+    loadData();
+    checkPaymentAlerts();
+    render();
     
-    // 로딩 화면 무조건 숨기기 (오류 여부 관계없이)
+    // 로딩 화면 숨기기
     setTimeout(() => {
-        const loadingScreen = document.getElementById('loadingScreen');
-        if (loadingScreen) {
-            loadingScreen.style.display = 'none';
-        }
-    }, 800); // 0.8초 후 무조건 숨김
+        document.getElementById('loadingScreen').style.display = 'none';
+    }, 1000);
     
     // 매일 결제일 체크
     setInterval(checkPaymentAlerts, 1000 * 60 * 60); // 1시간마다
@@ -141,45 +44,27 @@ function init() {
 
 // 데이터 로드
 function loadData() {
-    try {
-        // 저장된 데이터 로드
-        state.children = Storage.get('children') || [];
-        state.academies = Storage.get('academies') || [];
-        state.rewards = Storage.get('rewards') || [];
-        state.subscription = Storage.get('subscription') || {
-            status: 'trial',
-            trialStartDate: new Date().toISOString(),
-            planType: null
-        };
-        
-        // 현재 자녀 설정
-        state.currentChildId = Storage.get('currentChildId');
-        if (!state.currentChildId && state.children.length > 0) {
-            state.currentChildId = state.children[0].id;
-            Storage.set('currentChildId', state.currentChildId);
-        }
-        
-        // 데이터 마이그레이션 또는 초기 데이터
-        if (state.children.length === 0) {
-            // 데모 데이터 추가 (옵션)
-            try {
-                addDemoData();
-            } catch (e) {
-                console.error('데모 데이터 추가 오류:', e);
-                // 데모 데이터 없이도 계속 진행
-            }
-        }
-    } catch (error) {
-        console.error('데이터 로드 오류:', error);
-        // 기본값으로 초기화
-        state.children = [];
-        state.academies = [];
-        state.rewards = [];
-        state.subscription = {
-            status: 'trial',
-            trialStartDate: new Date().toISOString(),
-            planType: null
-        };
+    // 저장된 데이터 로드
+    state.children = Storage.get('children') || [];
+    state.academies = Storage.get('academies') || [];
+    state.rewards = Storage.get('rewards') || [];
+    state.subscription = Storage.get('subscription') || {
+        status: 'trial',
+        trialStartDate: new Date().toISOString(),
+        planType: null
+    };
+    
+    // 현재 자녀 설정
+    state.currentChildId = Storage.get('currentChildId');
+    if (!state.currentChildId && state.children.length > 0) {
+        state.currentChildId = state.children[0].id;
+        Storage.set('currentChildId', state.currentChildId);
+    }
+    
+    // 데이터 마이그레이션 또는 초기 데이터
+    if (state.children.length === 0) {
+        // 데모 데이터 추가 (옵션)
+        addDemoData();
     }
 }
 
@@ -262,41 +147,12 @@ function convertTimeToMinutes(timeString) {
 
 // 렌더링
 function render() {
-    try {
-        renderChildSelector();
-    } catch (e) {
-        console.error('자녀 선택 렌더 오류:', e);
-    }
-    
-    try {
-        renderTrialBanner();
-    } catch (e) {
-        console.error('체험 배너 렌더 오류:', e);
-    }
-    
-    try {
-        renderAcademies();
-    } catch (e) {
-        console.error('학원 목록 렌더 오류:', e);
-    }
-    
-    try {
-        renderBudget();
-    } catch (e) {
-        console.error('가계부 렌더 오류:', e);
-    }
-    
-    try {
-        renderRewards();
-    } catch (e) {
-        console.error('보상 렌더 오류:', e);
-    }
-    
-    try {
-        renderSettings();
-    } catch (e) {
-        console.error('설정 렌더 오류:', e);
-    }
+    renderChildSelector();
+    renderTrialBanner();
+    renderAcademies();
+    renderBudget();
+    renderRewards();
+    renderSettings();
 }
 
 // 자녀 선택기 렌더
@@ -413,17 +269,13 @@ function renderAcademies() {
                         <span class="info-value">${academy.departureTime}</span>
                     </div>
                     ${academy.fee ? `
-                    <div class="info-row">
-                        <span class="info-label">월 수업료:</span>
-                        <span class="info-value">${academy.fee.toLocaleString()}원</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">결제일:</span>
-                        <span class="info-value">매월 ${academy.paymentDay}일</span>
-                    </div>
+                        <div class="info-row">
+                            <span class="info-label">월 학원비:</span>
+                            <span class="info-value">${academy.fee.toLocaleString()}원</span>
+                        </div>
                     ` : ''}
                 </div>
-                ${academy.weatherAlerts.rain || academy.weatherAlerts.fineDust ? `
+                ${academy.weatherAlerts && (academy.weatherAlerts.rain || academy.weatherAlerts.fineDust) ? `
                     <div class="badge-row">
                         ${academy.weatherAlerts.rain ? '<span class="badge">☔ 비 알림</span>' : ''}
                         ${academy.weatherAlerts.fineDust ? '<span class="badge">😷 미세먼지</span>' : ''}
@@ -487,38 +339,34 @@ function renderBudget() {
 
 // 결제일 알림 체크 (NEW!)
 function checkPaymentAlerts() {
-    try {
-        const notifEnabled = document.getElementById('paymentNotif')?.checked !== false;
-        if (!notifEnabled) return;
+    const notifEnabled = document.getElementById('paymentNotif')?.checked !== false;
+    if (!notifEnabled) return;
+    
+    const childAcademies = state.academies.filter(a => a.childId === state.currentChildId);
+    const today = new Date();
+    const alerts = [];
+    
+    childAcademies.forEach(academy => {
+        if (!academy.fee || !academy.paymentDay) return;
         
-        const childAcademies = state.academies.filter(a => a.childId === state.currentChildId);
-        const today = new Date();
-        const alerts = [];
-        
-        childAcademies.forEach(academy => {
-            if (!academy.fee || !academy.paymentDay) return;
-            
-            const paymentDate = new Date(today.getFullYear(), today.getMonth(), academy.paymentDay);
-            if (paymentDate < today) {
-                paymentDate.setMonth(paymentDate.getMonth() + 1);
-            }
-            
-            const daysLeft = Math.ceil((paymentDate - today) / (1000 * 60 * 60 * 24));
-            
-            if (daysLeft === 5) {
-                alerts.push({
-                    academy,
-                    paymentDate,
-                    daysLeft
-                });
-            }
-        });
-        
-        if (alerts.length > 0) {
-            showPaymentAlert(alerts);
+        const paymentDate = new Date(today.getFullYear(), today.getMonth(), academy.paymentDay);
+        if (paymentDate < today) {
+            paymentDate.setMonth(paymentDate.getMonth() + 1);
         }
-    } catch (error) {
-        console.error('결제일 알림 체크 오류:', error);
+        
+        const daysLeft = Math.ceil((paymentDate - today) / (1000 * 60 * 60 * 24));
+        
+        if (daysLeft === 5) {
+            alerts.push({
+                academy,
+                paymentDate,
+                daysLeft
+            });
+        }
+    });
+    
+    if (alerts.length > 0) {
+        showPaymentAlert(alerts);
     }
 }
 
@@ -636,7 +484,7 @@ function logout() {
     }
 }
 
-// 모달 함수들 (간단 버전)
+// 모달 함수들
 function showAddChildModal() {
     const name = prompt('자녀 이름을 입력하세요:');
     if (!name) return;
@@ -866,188 +714,6 @@ function showChildrenManagement() {
 function showSubscriptionModal() {
     alert('구독 기능은 개발 중입니다.\n\n플랜:\n- 1자녀: 1,000원/월\n- 다자녀: 2,000원/월\n\n결제 수단: 토스페이, 카카오페이');
 }
-
-// ========================================
-// PWA 설치 기능
-// ========================================
-
-let deferredPrompt;
-let installSource = 'unknown'; // 설치 소스 추적
-
-// beforeinstallprompt 이벤트 캐치
-window.addEventListener('beforeinstallprompt', (e) => {
-    try {
-        console.log('PWA 설치 가능!');
-        
-        // 기본 브라우저 프롬프트 방지
-        e.preventDefault();
-        
-        // 나중에 사용하기 위해 이벤트 저장
-        deferredPrompt = e;
-        
-        // 설치 배너 표시 (3초 후)
-        setTimeout(() => {
-            showInstallBanner();
-        }, 3000);
-        
-        // 설정에 설치 메뉴 표시
-        const installMenuItem = document.getElementById('installMenuItem');
-        if (installMenuItem) {
-            installMenuItem.style.display = 'flex';
-        }
-    } catch (error) {
-        console.error('PWA 설치 프롬프트 오류:', error);
-    }
-});
-
-// 설치 배너 표시
-function showInstallBanner() {
-    try {
-        const banner = document.getElementById('installBanner');
-        if (banner && deferredPrompt) {
-            banner.style.display = 'block';
-            
-            // 설치 버튼에 이벤트 리스너 추가
-            const installBtn = document.getElementById('installBtn');
-            if (installBtn) {
-                installBtn.onclick = () => {
-                    installSource = 'banner';
-                    installPWA();
-                };
-            }
-        }
-    } catch (error) {
-        console.error('설치 배너 표시 오류:', error);
-    }
-}
-
-// 설치 배너 닫기
-function closeInstallBanner() {
-    document.getElementById('installBanner').style.display = 'none';
-    
-    // 로컬스토리지에 배너 닫음 기록
-    Storage.set('installBannerClosed', true);
-}
-
-// 설치 프롬프트 모달 표시
-function showInstallPrompt() {
-    // iOS인 경우
-    if (isIOS()) {
-        document.getElementById('iosInstallModal').style.display = 'flex';
-        return;
-    }
-    
-    // Android/Desktop
-    if (deferredPrompt) {
-        document.getElementById('installPromptModal').style.display = 'flex';
-        installSource = 'settings';
-    } else {
-        // 이미 설치되었거나 설치 불가능
-        if (isStandalone()) {
-            alert('이미 설치되어 있습니다! 👍');
-        } else {
-            alert('이 브라우저에서는 설치가 지원되지 않습니다.\n\nChrome 또는 Edge 브라우저를 사용해주세요.');
-        }
-    }
-}
-
-// 설치 프롬프트 모달 닫기
-function closeInstallPrompt() {
-    document.getElementById('installPromptModal').style.display = 'none';
-}
-
-// iOS 설치 모달 닫기
-function closeIOSInstallModal() {
-    document.getElementById('iosInstallModal').style.display = 'none';
-}
-
-// PWA 설치 실행
-async function installPWA() {
-    if (!deferredPrompt) {
-        alert('설치할 수 없습니다.');
-        return;
-    }
-    
-    // 설치 프롬프트 표시
-    deferredPrompt.prompt();
-    
-    // 사용자 응답 대기
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    console.log(`설치 결과: ${outcome} (소스: ${installSource})`);
-    
-    if (outcome === 'accepted') {
-        console.log('✅ PWA 설치 완료!');
-        
-        // 배너 숨기기
-        closeInstallBanner();
-        closeInstallPrompt();
-        
-        // 성공 메시지
-        setTimeout(() => {
-            alert('🎉 설치 완료!\n\n홈 화면에서 "학원가자" 앱을 찾아보세요!');
-        }, 500);
-    } else {
-        console.log('❌ 사용자가 설치 취소');
-    }
-    
-    // 프롬프트 초기화
-    deferredPrompt = null;
-}
-
-// iOS 감지
-function isIOS() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-}
-
-// 이미 설치되었는지 확인
-function isStandalone() {
-    return window.matchMedia('(display-mode: standalone)').matches || 
-           window.navigator.standalone === true;
-}
-
-// 앱 설치 완료 이벤트
-window.addEventListener('appinstalled', (e) => {
-    try {
-        console.log('✅ PWA가 성공적으로 설치되었습니다!');
-        
-        // 설치 메뉴 숨기기
-        const installMenuItem = document.getElementById('installMenuItem');
-        if (installMenuItem) {
-            installMenuItem.style.display = 'none';
-        }
-    } catch (error) {
-        console.error('앱 설치 완료 이벤트 오류:', error);
-    }
-});
-
-// 페이지 로드 시 설치 상태 확인
-window.addEventListener('load', () => {
-    try {
-        // 이미 설치된 경우 설치 메뉴 숨기기
-        if (isStandalone()) {
-            const installMenuItem = document.getElementById('installMenuItem');
-            if (installMenuItem) {
-                installMenuItem.style.display = 'none';
-            }
-            
-            const installBanner = document.getElementById('installBanner');
-            if (installBanner) {
-                installBanner.style.display = 'none';
-            }
-        }
-        
-        // iOS에서 설치 메뉴 항상 표시
-        if (isIOS() && !isStandalone()) {
-            const installMenuItem = document.getElementById('installMenuItem');
-            if (installMenuItem) {
-                installMenuItem.style.display = 'flex';
-            }
-        }
-    } catch (error) {
-        console.error('설치 상태 확인 오류:', error);
-    }
-});
 
 // 앱 시작
 document.addEventListener('DOMContentLoaded', init);
