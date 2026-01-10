@@ -398,6 +398,47 @@
                     </div>
                 </div>
 
+                <!-- GPS 위치 설정 -->
+                <div class="form-section" id="gpsSection" style="display: none;">
+                    <h3>📍 GPS 위치 설정</h3>
+                    <p class="form-hint">학원 도착 확인을 위한 위치를 설정하세요</p>
+                    
+                    <div class="gps-buttons">
+                        <button type="button" class="btn-gps" onclick="setAcademyLocation(document.getElementById('editingAcademyId').value, 'gate')">
+                            <span class="gps-icon">🏫</span>
+                            <span>학원 정문 위치</span>
+                            <span class="gps-status" id="gateStatus">미설정</span>
+                        </button>
+                        <button type="button" class="btn-gps" onclick="setAcademyLocation(document.getElementById('editingAcademyId').value, 'bus')">
+                            <span class="gps-icon">🚌</span>
+                            <span>버스 탑승 장소</span>
+                            <span class="gps-status" id="busStatus">미설정</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 음성 녹음 -->
+                <div class="form-section" id="voiceSection" style="display: none;">
+                    <h3>🎤 엄마 목소리 녹음</h3>
+                    <p class="form-hint">따뜻한 응원 메시지를 녹음하세요 💕</p>
+                    
+                    <div class="voice-recorder">
+                        <button type="button" class="btn-voice" id="recordBtn" onclick="startRecording(document.getElementById('editingAcademyId').value)">
+                            🎤 녹음 시작
+                        </button>
+                        <button type="button" class="btn-voice btn-recording" id="stopBtn" style="display: none;" onclick="stopRecording()">
+                            ⏹️ 녹음 중지
+                        </button>
+                        <div id="recordingIndicator" class="recording-indicator" style="display: none;">
+                            <span class="recording-dot"></span>
+                            녹음 중...
+                        </div>
+                        <button type="button" class="btn-voice btn-play" id="playBtn" style="display: none;" onclick="playVoiceMessage(document.getElementById('editingAcademyId').value)">
+                            ▶️ 듣기
+                        </button>
+                    </div>
+                </div>
+
                 <!-- 버튼 -->
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeAcademyModal()">취소</button>
