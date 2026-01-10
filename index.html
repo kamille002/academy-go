@@ -20,6 +20,24 @@
     </style>
 </head>
 <body>
+    <!-- PC 레이아웃 래퍼 -->
+    <div class="desktop-wrapper">
+        <!-- 좌측 광고 영역 (PC만 표시) -->
+        <aside class="ad-sidebar ad-left">
+            <div class="ad-content">
+                <div class="ad-placeholder ad-250">
+                    <p>광고 영역 1</p>
+                    <small>300 x 250</small>
+                </div>
+                <div class="ad-placeholder ad-600">
+                    <p>광고 영역 2</p>
+                    <small>300 x 600</small>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 메인 앱 영역 -->
+        <div class="app-wrapper">
     <!-- 로딩 화면 -->
     <div id="loadingScreen" class="loading-screen">
         <div class="loading-content">
@@ -240,6 +258,10 @@
                 <div class="settings-section">
                     <h3>ℹ️ 앱 정보</h3>
                     <div class="menu-list">
+                        <button class="menu-item" onclick="showInstallGuide()">
+                            <span>📱 홈 화면에 추가</span>
+                            <span class="menu-arrow">›</span>
+                        </button>
                         <div class="menu-item">
                             <span>버전 정보</span>
                             <span class="menu-value">v1.0.0 PWA</span>
@@ -448,6 +470,26 @@
             </form>
         </div>
     </div>
+    
+        </div>
+        <!-- 메인 앱 영역 끝 -->
+
+        <!-- 우측 광고 영역 (PC만 표시) -->
+        <aside class="ad-sidebar ad-right">
+            <div class="ad-content">
+                <div class="ad-placeholder ad-250">
+                    <p>광고 영역 3</p>
+                    <small>300 x 250</small>
+                </div>
+                <div class="ad-placeholder ad-600">
+                    <p>광고 영역 4</p>
+                    <small>300 x 600</small>
+                </div>
+            </div>
+        </aside>
+    </div>
+    <!-- PC 레이아웃 래퍼 끝 -->
+
     <!-- Scripts -->
     <script src="app.js"></script>
     
