@@ -382,6 +382,45 @@ body {
     font-weight: 600;
 }
 
+/* 학원 액션 버튼 */
+.academy-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid #E0E0E0;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 10px 16px;
+    border: 2px solid var(--btn-primary);
+    border-radius: 8px;
+    background: white;
+    color: var(--btn-primary);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-action:hover {
+    background: var(--btn-primary);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-action.btn-primary {
+    background: var(--btn-primary);
+    color: white;
+}
+
+.btn-action.btn-primary:hover {
+    background: var(--btn-hover);
+}
+
 /* 가계부 */
 .budget-summary {
     margin-bottom: 32px;
@@ -942,4 +981,113 @@ body {
     .modal-actions .btn-danger {
         order: -1;
     }
+}
+
+/* GPS 및 음성 녹음 스타일 */
+.form-hint {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.gps-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.btn-gps {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border: 2px solid #E0E0E0;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    font-size: 16px;
+}
+
+.btn-gps:hover {
+    border-color: var(--btn-primary);
+    background: rgba(180, 167, 214, 0.05);
+}
+
+.gps-icon {
+    font-size: 24px;
+}
+
+.gps-status {
+    margin-left: auto;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.voice-recorder {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn-voice {
+    width: 100%;
+    padding: 16px;
+    border: 2px solid var(--btn-primary);
+    border-radius: 12px;
+    background: white;
+    color: var(--btn-primary);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.btn-voice:hover {
+    background: var(--btn-primary);
+    color: white;
+}
+
+.btn-voice.btn-recording {
+    background: var(--error);
+    border-color: var(--error);
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.btn-voice.btn-play {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+}
+
+.recording-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--error);
+}
+
+.recording-dot {
+    width: 12px;
+    height: 12px;
+    background: var(--error);
+    border-radius: 50%;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }
