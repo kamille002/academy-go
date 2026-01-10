@@ -20,12 +20,92 @@
     </style>
 </head>
 <body>
-    <!-- 로딩 화면 -->
+    <!-- PWA 설치 안내 배너 -->
+    <div id="installBanner" class="install-banner" style="display: none;">
+        <div class="install-content">
+            <span class="install-icon">📱</span>
+            <div class="install-text">
+                <strong>학원가자 앱 설치</strong>
+                <p>홈 화면에 추가하고 앱처럼 사용하세요!</p>
+            </div>
+            <button class="install-btn" id="installBtn">설치</button>
+            <button class="install-close" onclick="closeInstallBanner()">×</button>
+        </div>
+    </div>
+
+    <!-- PC 레이아웃 래퍼 -->
+    <div class="desktop-wrapper">
+        <!-- 좌측 광고 배너 (PC만) -->
+        <aside class="ad-banner ad-banner-left">
+            <div class="ad-banner-content">
+                <div class="ad-placeholder">
+                    광고 영역 1<br>300 x 250
+                </div>
+                <div class="ad-placeholder" style="height: 600px;">
+                    광고 영역 2<br>300 x 600
+                </div>
+            </div>
+        </aside>
+
+        <!-- 메인 앱 컨테이너 -->
+        <div class="app-container-wrapper">
+            <!-- 로딩 화면 -->
     <div id="loadingScreen" class="loading-screen">
         <div class="loading-content">
             <div class="loading-emoji">🏫</div>
             <h1>학원가자</h1>
             <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <!-- PWA 설치 안내 모달 -->
+    <div id="installPromptModal" class="modal" style="display: none;">
+        <div class="modal-content install-prompt">
+            <div class="install-icon">📱</div>
+            <h2>앱으로 설치하기</h2>
+            <p>학원가자를 홈 화면에 추가하고<br>앱처럼 편리하게 사용하세요!</p>
+            
+            <div class="install-benefits">
+                <div class="benefit-item">✅ 빠른 실행</div>
+                <div class="benefit-item">✅ 오프라인 사용</div>
+                <div class="benefit-item">✅ 푸시 알림</div>
+            </div>
+            
+            <div class="install-actions">
+                <button class="btn btn-secondary" onclick="closeInstallPrompt()">나중에</button>
+                <button class="btn btn-primary" id="installButton" onclick="installPWA()">설치하기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- iOS 설치 안내 모달 -->
+    <div id="iosInstallModal" class="modal" style="display: none;">
+        <div class="modal-content ios-install-guide">
+            <h2>📱 iPhone 설치 방법</h2>
+            <div class="install-steps">
+                <div class="install-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <p>하단의 <strong>공유 버튼</strong>을 누르세요</p>
+                        <div class="step-icon">⬆️</div>
+                    </div>
+                </div>
+                <div class="install-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <p><strong>"홈 화면에 추가"</strong>를 선택하세요</p>
+                        <div class="step-icon">➕</div>
+                    </div>
+                </div>
+                <div class="install-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <p><strong>"추가"</strong> 버튼을 누르세요</p>
+                        <div class="step-icon">✓</div>
+                    </div>
+                </div>
+            </div>
+            <button class="btn btn-primary" onclick="closeIOSInstallModal()">확인</button>
         </div>
     </div>
 
@@ -240,6 +320,10 @@
                 <div class="settings-section">
                     <h3>ℹ️ 앱 정보</h3>
                     <div class="menu-list">
+                        <button class="menu-item" id="installMenuItem" onclick="showInstallPrompt()" style="display: none;">
+                            <span>📱 홈 화면에 추가</span>
+                            <span class="menu-arrow">›</span>
+                        </button>
                         <div class="menu-item">
                             <span>버전 정보</span>
                             <span class="menu-value">v1.0.0 PWA</span>
@@ -258,6 +342,23 @@
             </div>
         </main>
     </div>
+
+        </div>
+        <!-- /app-container -->
+        
+        <!-- 우측 광고 배너 (PC만) -->
+        <aside class="ad-banner ad-banner-right">
+            <div class="ad-banner-content">
+                <div class="ad-placeholder">
+                    광고 영역 3<br>300 x 250
+                </div>
+                <div class="ad-placeholder" style="height: 600px;">
+                    광고 영역 4<br>300 x 600
+                </div>
+            </div>
+        </aside>
+    </div>
+    <!-- /desktop-wrapper -->
 
     <!-- 학원 추가/수정 모달 -->
     <div id="academyModal" class="modal" style="display: none;">
@@ -407,6 +508,23 @@
             </form>
         </div>
     </div>
+
+        </div>
+        <!-- 메인 앱 컨테이너 끝 -->
+
+        <!-- 우측 광고 배너 (PC만) -->
+        <aside class="ad-banner ad-banner-right">
+            <div class="ad-banner-content">
+                <div class="ad-placeholder">
+                    광고 영역 3<br>300 x 250
+                </div>
+                <div class="ad-placeholder" style="height: 600px;">
+                    광고 영역 4<br>300 x 600
+                </div>
+            </div>
+        </aside>
+    </div>
+    <!-- desktop-wrapper 끝 -->
 
     <!-- Scripts -->
     <script src="app.js"></script>
