@@ -40,6 +40,18 @@ function init() {
     
     // 매일 결제일 체크
     setInterval(checkPaymentAlerts, 1000 * 60 * 60); // 1시간마다
+    
+    // 알림 스케줄링
+    scheduleNotifications();
+    
+    // 알림 권한 요청 (첫 실행 시)
+    if ('Notification' in window && Notification.permission === 'default') {
+        setTimeout(() => {
+            if (confirm('학원 출발 시간 알림을 받으시겠어요?')) {
+                requestNotificationPermission();
+            }
+        }, 3000);
+    }
 }
 
 // 데이터 로드
@@ -281,6 +293,10 @@ function renderAcademies() {
                         ${academy.weatherAlerts.fineDust ? '<span class="badge">😷 미세먼지</span>' : ''}
                     </div>
                 ` : ''}
+                <div class="academy-actions">
+                    ${academy.voiceMessage ? '<button class="btn-action" onclick="playVoiceMessage(\'' + academy.id + '\')">🎤 엄마 목소리 듣기</button>' : ''}
+                    <button class="btn-action btn-primary" onclick="checkAttendance('${academy.id}')">✅ 출석 체크</button>
+                </div>
             </div>
         `;
     }).join('');
@@ -515,6 +531,10 @@ function showAddAcademyModal() {
     document.getElementById('academyModalTitle').textContent = '🏫 학원 추가';
     document.getElementById('deleteAcademyBtn').style.display = 'none';
     
+    // GPS 및 음성 섹션 숨김 (추가 모드에서는 저장 후에 설정)
+    document.getElementById('gpsSection').style.display = 'none';
+    document.getElementById('voiceSection').style.display = 'none';
+    
     // 기본값 설정
     document.getElementById('classTime').value = '16:00';
     document.getElementById('departureTime').value = '15:30';
@@ -563,6 +583,34 @@ function editAcademy(id) {
     // 알림 설정
     document.getElementById('rainAlert').checked = academy.weatherAlerts?.rain || false;
     document.getElementById('dustAlert').checked = academy.weatherAlerts?.fineDust || false;
+    
+    // GPS 섹션 표시 (수정 모드에서만)
+    document.getElementById('gpsSection').style.display = 'block';
+    document.getElementById('voiceSection').style.display = 'block';
+    
+    // GPS 상태 업데이트
+    if (academy.locationGate) {
+        document.getElementById('gateStatus').textContent = '✅ 설정됨';
+        document.getElementById('gateStatus').style.color = 'var(--success)';
+    } else {
+        document.getElementById('gateStatus').textContent = '미설정';
+        document.getElementById('gateStatus').style.color = 'var(--text-secondary)';
+    }
+    
+    if (academy.locationBus) {
+        document.getElementById('busStatus').textContent = '✅ 설정됨';
+        document.getElementById('busStatus').style.color = 'var(--success)';
+    } else {
+        document.getElementById('busStatus').textContent = '미설정';
+        document.getElementById('busStatus').style.color = 'var(--text-secondary)';
+    }
+    
+    // 음성 메시지 상태 업데이트
+    if (academy.voiceMessage) {
+        document.getElementById('playBtn').style.display = 'block';
+    } else {
+        document.getElementById('playBtn').style.display = 'none';
+    }
     
     // 모달 표시
     document.getElementById('academyModal').style.display = 'flex';
@@ -713,6 +761,444 @@ function showChildrenManagement() {
 
 function showSubscriptionModal() {
     alert('구독 기능은 개발 중입니다.\n\n플랜:\n- 1자녀: 1,000원/월\n- 다자녀: 2,000원/월\n\n결제 수단: 토스페이, 카카오페이');
+}
+
+// ========================================
+// 🌤️ 날씨 API
+// ========================================
+
+const WEATHER_API_KEY = '5c1484b99707cec9adb86ba7cbd7bd0e';
+
+// 날씨 정보 가져오기
+async function getWeather(lat, lon) {
+    try {
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric&lang=kr`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        return {
+            temp: Math.round(data.main.temp),
+            weather: data.weather[0].main,
+            description: data.weather[0].description,
+            icon: data.weather[0].icon
+        };
+    } catch (error) {
+        console.error('날씨 정보 가져오기 실패:', error);
+        return null;
+    }
+}
+
+// 미세먼지 정보 가져오기
+async function getAirQuality(lat, lon) {
+    try {
+        const url = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        const aqi = data.list[0].main.aqi; // 1~5
+        return {
+            aqi: aqi,
+            level: ['좋음', '보통', '나쁨', '매우 나쁨', '최악'][aqi - 1]
+        };
+    } catch (error) {
+        console.error('미세먼지 정보 가져오기 실패:', error);
+        return null;
+    }
+}
+
+// 날씨 알림 체크
+async function checkWeatherAlerts(academy) {
+    if (!academy.weatherAlerts) return null;
+    
+    // 학원 위치가 있으면 그 위치, 없으면 현재 위치 사용
+    let lat, lon;
+    
+    if (academy.locationGate) {
+        lat = academy.locationGate.lat;
+        lon = academy.locationGate.lon;
+    } else {
+        // 현재 위치 사용
+        const position = await getCurrentPosition();
+        if (!position) return null;
+        lat = position.latitude;
+        lon = position.longitude;
+    }
+    
+    const alerts = [];
+    
+    // 날씨 체크
+    if (academy.weatherAlerts.rain) {
+        const weather = await getWeather(lat, lon);
+        if (weather && (weather.weather === 'Rain' || weather.weather === 'Snow')) {
+            alerts.push({
+                type: 'weather',
+                message: weather.weather === 'Rain' ? '☔ 비가 옵니다! 우산을 챙기세요!' : '❄️ 눈이 옵니다! 따뜻하게 입으세요!',
+                icon: weather.icon
+            });
+        }
+    }
+    
+    // 미세먼지 체크
+    if (academy.weatherAlerts.fineDust) {
+        const airQuality = await getAirQuality(lat, lon);
+        if (airQuality && airQuality.aqi >= 3) { // 나쁨 이상
+            alerts.push({
+                type: 'air',
+                message: `😷 미세먼지가 ${airQuality.level}입니다! 마스크를 챙기세요!`,
+                level: airQuality.level
+            });
+        }
+    }
+    
+    return alerts.length > 0 ? alerts : null;
+}
+
+// ========================================
+// 📍 GPS 위치 관리
+// ========================================
+
+// 현재 위치 가져오기
+function getCurrentPosition() {
+    return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+            reject(new Error('GPS를 지원하지 않는 브라우저입니다.'));
+            return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                resolve({
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                });
+            },
+            (error) => {
+                reject(error);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            }
+        );
+    });
+}
+
+// 두 지점 간 거리 계산 (미터)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // 지구 반지름 (미터)
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    
+    return R * c; // 미터 단위
+}
+
+// 학원 위치 설정
+async function setAcademyLocation(academyId, locationType) {
+    try {
+        const position = await getCurrentPosition();
+        const academy = state.academies.find(a => a.id === academyId);
+        
+        if (!academy) return;
+        
+        if (locationType === 'gate') {
+            academy.locationGate = {
+                lat: position.latitude,
+                lon: position.longitude,
+                accuracy: position.accuracy,
+                setAt: new Date().toISOString()
+            };
+        } else if (locationType === 'bus') {
+            academy.locationBus = {
+                lat: position.latitude,
+                lon: position.longitude,
+                accuracy: position.accuracy,
+                setAt: new Date().toISOString()
+            };
+        }
+        
+        saveData();
+        alert('✅ 위치가 저장되었습니다!');
+        
+    } catch (error) {
+        console.error('위치 저장 실패:', error);
+        alert('❌ 위치를 가져올 수 없습니다.\nGPS를 켜주세요.');
+    }
+}
+
+// ========================================
+// 🎤 음성 녹음
+// ========================================
+
+let mediaRecorder = null;
+let audioChunks = [];
+
+// 녹음 시작
+async function startRecording(academyId) {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = (event) => {
+            audioChunks.push(event.data);
+        };
+        
+        mediaRecorder.onstop = () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            saveVoiceMessage(academyId, audioBlob);
+            
+            // 스트림 종료
+            stream.getTracks().forEach(track => track.stop());
+        };
+        
+        mediaRecorder.start();
+        
+        // UI 업데이트
+        document.getElementById('recordBtn').style.display = 'none';
+        document.getElementById('stopBtn').style.display = 'block';
+        document.getElementById('recordingIndicator').style.display = 'block';
+        
+    } catch (error) {
+        console.error('녹음 시작 실패:', error);
+        alert('❌ 마이크 접근 권한이 필요합니다.');
+    }
+}
+
+// 녹음 중지
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        
+        // UI 업데이트
+        document.getElementById('recordBtn').style.display = 'block';
+        document.getElementById('stopBtn').style.display = 'none';
+        document.getElementById('recordingIndicator').style.display = 'none';
+    }
+}
+
+// 음성 메시지 저장
+function saveVoiceMessage(academyId, audioBlob) {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        const base64Audio = reader.result;
+        
+        const academy = state.academies.find(a => a.id === academyId);
+        if (academy) {
+            academy.voiceMessage = {
+                data: base64Audio,
+                recordedAt: new Date().toISOString()
+            };
+            saveData();
+            alert('✅ 엄마 목소리가 저장되었습니다! 💕');
+        }
+    };
+    reader.readAsDataURL(audioBlob);
+}
+
+// 음성 메시지 재생
+function playVoiceMessage(academyId) {
+    const academy = state.academies.find(a => a.id === academyId);
+    if (!academy || !academy.voiceMessage) {
+        alert('저장된 음성 메시지가 없습니다.');
+        return;
+    }
+    
+    const audio = new Audio(academy.voiceMessage.data);
+    audio.play();
+}
+
+// ========================================
+// ✅ 출석 체크
+// ========================================
+
+// 출석 체크 (GPS 기반)
+async function checkAttendance(academyId) {
+    try {
+        const academy = state.academies.find(a => a.id === academyId);
+        if (!academy || !academy.locationGate) {
+            alert('학원 위치가 설정되지 않았습니다.');
+            return;
+        }
+        
+        const currentPosition = await getCurrentPosition();
+        const distance = calculateDistance(
+            currentPosition.latitude,
+            currentPosition.longitude,
+            academy.locationGate.lat,
+            academy.locationGate.lon
+        );
+        
+        // 50미터 이내면 출석 인정
+        if (distance <= 50) {
+            const now = new Date();
+            const arrivalTime = now.toTimeString().split(' ')[0].substring(0, 5);
+            
+            // 포인트 계산
+            const scheduledTime = academy.schedule.find(s => s.day === now.getDay());
+            let points = 0;
+            
+            if (scheduledTime) {
+                const scheduledMinutes = convertTimeToMinutes(scheduledTime.time);
+                const arrivalMinutes = convertTimeToMinutes(arrivalTime);
+                const diff = scheduledMinutes - arrivalMinutes;
+                
+                if (diff >= 10) points = 10; // 10분 일찍
+                else if (diff >= 5) points = 3; // 5분 일찍
+                else if (diff >= 0) points = 2; // 정시
+            }
+            
+            // 출석 기록 저장
+            if (!academy.attendance) academy.attendance = [];
+            academy.attendance.push({
+                date: now.toISOString().split('T')[0],
+                time: arrivalTime,
+                distance: Math.round(distance),
+                points: points
+            });
+            
+            // 포인트 적립
+            const currentChild = getCurrentChild();
+            if (currentChild) {
+                currentChild.totalPoints += points;
+            }
+            
+            saveData();
+            render();
+            
+            // 성공 메시지
+            alert(`🎉 출석 완료!\n\n거리: ${Math.round(distance)}m\n포인트: +${points}P`);
+            
+            // 폭죽 효과 (출석률 달성 시)
+            checkAttendanceRate(academy);
+            
+        } else {
+            alert(`❌ 학원에서 너무 멀어요!\n\n현재 거리: ${Math.round(distance)}m\n(50m 이내에서 출석 가능)`);
+        }
+        
+    } catch (error) {
+        console.error('출석 체크 실패:', error);
+        alert('❌ 위치를 확인할 수 없습니다.');
+    }
+}
+
+// 출석률 체크 및 폭죽 효과
+function checkAttendanceRate(academy) {
+    if (!academy.attendance || academy.attendance.length === 0) return;
+    
+    // 최근 30일 출석률 계산
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const recentAttendance = academy.attendance.filter(a => {
+        const attendanceDate = new Date(a.date);
+        return attendanceDate >= thirtyDaysAgo;
+    });
+    
+    // 예상 출석 횟수 계산 (주당 수업 횟수 * 4주)
+    const weeklyClasses = academy.schedule.filter(s => s.enabled).length;
+    const expectedAttendance = weeklyClasses * 4;
+    
+    const rate = (recentAttendance.length / expectedAttendance) * 100;
+    
+    // 출석률 달성 시 폭죽
+    if (rate >= 100) {
+        showFireworks('🎊 완벽! 100% 출석! 🎊');
+    } else if (rate >= 90) {
+        showFireworks('🎉 대단해! 90% 출석! 🎉');
+    } else if (rate >= 85) {
+        showFireworks('👏 잘했어! 85% 출석! 👏');
+    }
+}
+
+// 폭죽 효과
+function showFireworks(message) {
+    // 간단한 alert로 구현 (나중에 애니메이션 추가 가능)
+    setTimeout(() => {
+        alert(message);
+    }, 500);
+}
+
+// ========================================
+// 🔔 알림 시스템
+// ========================================
+
+// 출발 알림 예약
+function scheduleNotifications() {
+    // 모든 학원의 출발 시간 체크
+    const today = new Date().getDay();
+    const now = new Date();
+    
+    state.academies.forEach(academy => {
+        const todaySchedule = academy.schedule.find(s => s.day === today && s.enabled);
+        if (!todaySchedule) return;
+        
+        // 출발 시간
+        const departureTime = academy.departureTime.split(':');
+        const departureHour = parseInt(departureTime[0]);
+        const departureMinute = parseInt(departureTime[1]);
+        
+        const departureDate = new Date();
+        departureDate.setHours(departureHour, departureMinute, 0);
+        
+        // 이미 지난 시간이면 스킵
+        if (departureDate < now) return;
+        
+        // 알림 예약
+        const timeUntilDeparture = departureDate - now;
+        
+        setTimeout(() => {
+            showNotification(academy);
+        }, timeUntilDeparture);
+    });
+}
+
+// 알림 표시
+async function showNotification(academy) {
+    // 날씨 알림 체크
+    const weatherAlerts = await checkWeatherAlerts(academy);
+    
+    let message = `🏫 ${academy.name}\n⏰ 출발 시간입니다!\n`;
+    
+    if (weatherAlerts) {
+        weatherAlerts.forEach(alert => {
+            message += `\n${alert.message}`;
+        });
+    }
+    
+    // 음성 메시지 재생
+    if (academy.voiceMessage) {
+        playVoiceMessage(academy.id);
+    }
+    
+    // 알림 표시
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('학원가자 알림', {
+            body: message,
+            icon: '/icon-192.png'
+        });
+    } else {
+        alert(message);
+    }
+}
+
+// 알림 권한 요청
+function requestNotificationPermission() {
+    if ('Notification' in window) {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                alert('✅ 알림 권한이 허용되었습니다!');
+            }
+        });
+    }
 }
 
 // 앱 시작
