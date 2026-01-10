@@ -59,78 +59,87 @@
 
         <!-- 메인 컨텐츠 -->
         <main class="main-content">
-            <!-- 음성 메시지 섹션 -->
-            <section class="message-section">
-                <h2 class="section-title">💬 부모님께 메시지</h2>
-                
-                <div class="voice-message-card">
-                    <p class="voice-hint">마이크를 꾹 눌러서 녹음해요!</p>
-                    <button class="voice-record-btn" id="voiceRecordBtn" onmousedown="startChildRecording()" onmouseup="stopChildRecording()" ontouchstart="startChildRecording()" ontouchend="stopChildRecording()">
-                        <div class="mic-icon" id="micIcon">🎤</div>
-                        <div class="recording-wave" id="recordingWave" style="display: none;">
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                            <span></span>
-                            <span></span>
+            <!-- 오늘의 학원 섹션 -->
+            <section class="today-academies-section">
+                <h2 class="section-title">⏰ 오늘 갈 학원</h2>
+                <div id="todayAcademiesList" class="today-academies-list">
+                    <!-- 오늘 학원 카드들 -->
+                </div>
+            </section>
+
+            <!-- 부모님께 메시지 섹션 (접기 가능) -->
+            <section class="message-section collapsible">
+                <div class="section-header" onclick="toggleSection('messageSection')">
+                    <h2 class="section-title">💬 부모님께 메시지</h2>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div id="messageSection" class="section-content" style="display: none;">
+                    <div class="voice-message-card">
+                        <p class="voice-hint">마이크를 꾹 눌러서 녹음해요!</p>
+                        <button class="voice-record-btn" id="voiceRecordBtn" onmousedown="startChildRecording()" onmouseup="stopChildRecording()" ontouchstart="startChildRecording()" ontouchend="stopChildRecording()">
+                            <div class="mic-icon" id="micIcon">🎤</div>
+                            <div class="recording-wave" id="recordingWave" style="display: none;">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                            <span class="btn-text" id="recordBtnText">눌러서 녹음</span>
+                        </button>
+                        <div class="recording-timer" id="recordingTimer" style="display: none;">
+                            00:00
                         </div>
-                        <span class="btn-text" id="recordBtnText">눌러서 녹음</span>
-                    </button>
-                    <div class="recording-timer" id="recordingTimer" style="display: none;">
-                        00:00
                     </div>
-                </div>
 
-                <div class="quick-messages">
-                    <p class="quick-hint">빠른 메시지</p>
-                    <div class="quick-btn-grid">
-                        <button class="quick-btn" onclick="sendQuickMessage('🍗', '치킨 사주세요!')">
-                            <span class="quick-emoji">🍗</span>
-                            <span class="quick-text">치킨!</span>
-                        </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('🍚', '배고파요!')">
-                            <span class="quick-emoji">🍚</span>
-                            <span class="quick-text">배고파</span>
-                        </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('🎮', '게임 30분만!')">
-                            <span class="quick-emoji">🎮</span>
-                            <span class="quick-text">게임</span>
-                        </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('🎁', '선물 주세요!')">
-                            <span class="quick-emoji">🎁</span>
-                            <span class="quick-text">선물</span>
-                        </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('💕', '사랑해요!')">
-                            <span class="quick-emoji">💕</span>
-                            <span class="quick-text">사랑해</span>
-                        </button>
-                        <button class="quick-btn" onclick="sendQuickMessage('📱', '폰 쓰고 싶어요!')">
-                            <span class="quick-emoji">📱</span>
-                            <span class="quick-text">폰</span>
-                        </button>
+                    <div class="quick-messages">
+                        <p class="quick-hint">빠른 메시지</p>
+                        <div class="quick-btn-grid">
+                            <button class="quick-btn" onclick="sendQuickMessage('🍗', '치킨 사주세요!')">
+                                <span class="quick-emoji">🍗</span>
+                                <span class="quick-text">치킨!</span>
+                            </button>
+                            <button class="quick-btn" onclick="sendQuickMessage('🍚', '배고파요!')">
+                                <span class="quick-emoji">🍚</span>
+                                <span class="quick-text">배고파</span>
+                            </button>
+                            <button class="quick-btn" onclick="sendQuickMessage('🎮', '게임 30분만!')">
+                                <span class="quick-emoji">🎮</span>
+                                <span class="quick-text">게임</span>
+                            </button>
+                            <button class="quick-btn" onclick="sendQuickMessage('🎁', '선물 주세요!')">
+                                <span class="quick-emoji">🎁</span>
+                                <span class="quick-text">선물</span>
+                            </button>
+                            <button class="quick-btn" onclick="sendQuickMessage('💕', '사랑해요!')">
+                                <span class="quick-emoji">💕</span>
+                                <span class="quick-text">사랑해</span>
+                            </button>
+                            <button class="quick-btn" onclick="sendQuickMessage('📱', '폰 쓰고 싶어요!')">
+                                <span class="quick-emoji">📱</span>
+                                <span class="quick-text">폰</span>
+                            </button>
+                        </div>
                     </div>
-                </div>
 
-                <!-- 보낸 메시지 -->
-                <div class="sent-messages" id="sentMessages" style="display: none;">
-                    <h3 class="sent-title">📬 보낸 메시지</h3>
-                    <div id="messageList"></div>
+                    <!-- 보낸 메시지 -->
+                    <div class="sent-messages" id="sentMessages" style="display: none;">
+                        <h3 class="sent-title">📬 보낸 메시지</h3>
+                        <div id="messageList"></div>
+                    </div>
                 </div>
             </section>
 
-            <!-- 출석 체크 섹션 -->
-            <section class="attendance-section">
-                <h2 class="section-title">✅ 학원 출석</h2>
-                <div id="academyList" class="academy-list">
-                    <!-- 학원 카드들 -->
+            <!-- 보상 섹션 (접기 가능) -->
+            <section class="rewards-section collapsible">
+                <div class="section-header" onclick="toggleSection('rewardsSection')">
+                    <h2 class="section-title">🎁 내 보상</h2>
+                    <span class="toggle-icon">▼</span>
                 </div>
-            </section>
-
-            <!-- 보상 섹션 -->
-            <section class="rewards-section">
-                <h2 class="section-title">🎁 내 보상</h2>
-                <div id="rewardsList" class="rewards-list">
-                    <!-- 보상 카드들 -->
+                <div id="rewardsSection" class="section-content" style="display: none;">
+                    <div id="rewardsList" class="rewards-list">
+                        <!-- 보상 카드들 -->
+                    </div>
                 </div>
             </section>
 
