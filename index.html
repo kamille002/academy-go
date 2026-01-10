@@ -73,6 +73,10 @@
                         <option value="">자녀 선택</option>
                     </select>
                     <button class="btn-icon" onclick="showAddChildModal()">👤+</button>
+                    <button class="btn-icon" onclick="showChildMessages()" id="messageBtn" style="position: relative;">
+                        💌
+                        <span id="messageCount" class="message-badge" style="display: none;"></span>
+                    </button>
                 </div>
             </div>
             <div class="header-points">
@@ -258,6 +262,10 @@
                 <div class="settings-section">
                     <h3>ℹ️ 앱 정보</h3>
                     <div class="menu-list">
+                        <button class="menu-item" onclick="showFamilyCode()">
+                            <span>👨‍👩‍👧 가족 코드 보기</span>
+                            <span class="menu-arrow">›</span>
+                        </button>
                         <button class="menu-item" onclick="showInstallGuide()">
                             <span>📱 홈 화면에 추가</span>
                             <span class="menu-arrow">›</span>
@@ -279,6 +287,17 @@
                 </button>
             </div>
         </main>
+    </div>
+
+    <!-- 자녀 메시지 모달 -->
+    <div id="childMessagesModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h2>💌 <span id="currentChildNameMsg"></span>의 메시지</h2>
+            <div id="childMessagesList" class="child-messages-list">
+                <!-- 메시지 목록 -->
+            </div>
+            <button class="btn btn-secondary" onclick="closeChildMessagesModal()">닫기</button>
+        </div>
     </div>
 
     <!-- 학원 추가/수정 모달 -->
@@ -490,6 +509,9 @@
     </div>
     <!-- PC 레이아웃 래퍼 끝 -->
 
+    <!-- Supabase 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <!-- Scripts -->
     <script src="app.js"></script>
     
