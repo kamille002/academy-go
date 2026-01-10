@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 배경 -->
+  <rect width="512" height="512" fill="#FFFACD" rx="100"/>
+  
+  <!-- 학교 건물 -->
+  <g>
+    <!-- 지붕 -->
+    <path d="M 256 120 L 400 200 L 400 220 L 112 220 L 112 200 Z" fill="#B4A7D6"/>
+    
+    <!-- 건물 본체 -->
+    <rect x="140" y="220" width="232" height="200" fill="#FFF9E6" stroke="#B4A7D6" stroke-width="4"/>
+    
+    <!-- 문 -->
+    <rect x="226" y="320" width="60" height="100" fill="#B4A7D6" rx="5"/>
+    <circle cx="270" cy="370" r="4" fill="#FFD700"/>
+    
+    <!-- 창문들 -->
+    <rect x="170" y="250" width="40" height="40" fill="#64B5F6" stroke="#B4A7D6" stroke-width="2"/>
+    <rect x="236" y="250" width="40" height="40" fill="#64B5F6" stroke="#B4A7D6" stroke-width="2"/>
+    <rect x="302" y="250" width="40" height="40" fill="#64B5F6" stroke="#B4A7D6" stroke-width="2"/>
+    
+    <!-- 깃발 -->
+    <line x1="256" y1="120" x2="256" y2="80" stroke="#B4A7D6" stroke-width="4"/>
+    <path d="M 256 80 L 290 90 L 256 100 Z" fill="#FFD700"/>
+  </g>
+  
+  <!-- 포인트 별 -->
+  <circle cx="420" cy="100" r="35" fill="#FFD700"/>
+  <text x="420" y="115" font-size="40" text-anchor="middle" fill="#333">🏆</text>
+</svg>

@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#FFFACD">
+    <meta name="description" content="자녀의 학원 생활을 똑똑하게 관리하는 앱">
+    <title>학원가자 - 스마트 학원 관리</title>
+    
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Fonts -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap');
+    </style>
+</head>
+<body>
+    <!-- 로딩 화면 -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-emoji">🏫</div>
+            <h1>학원가자</h1>
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <!-- 결제일 알림 모달 -->
+    <div id="paymentAlertModal" class="modal" style="display: none;">
+        <div class="modal-content payment-alert">
+            <div class="alert-icon">⚠️</div>
+            <h2>결제일 알림</h2>
+            <div id="paymentAlertContent"></div>
+            <button class="btn btn-primary" onclick="closePaymentAlert()">확인</button>
+        </div>
+    </div>
+
+    <!-- 무료 체험 배너 -->
+    <div id="trialBanner" class="trial-banner" style="display: none;">
+        <span>⏰ 무료 체험 D-<span id="trialDays">0</span></span>
+    </div>
+
+    <!-- 앱 컨테이너 -->
+    <div id="app" class="app-container">
+        <!-- 헤더 -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="header-title">학원가자</h1>
+                <div class="header-child-selector">
+                    <select id="childSelector" class="child-select" onchange="switchChild()">
+                        <option value="">자녀 선택</option>
+                    </select>
+                    <button class="btn-icon" onclick="showAddChildModal()">👤+</button>
+                </div>
+            </div>
+            <div class="header-points">
+                <span>🏆 <span id="currentPoints">0</span>P</span>
+            </div>
+        </header>
+
+        <!-- 탭 네비게이션 -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" onclick="showTab('academies')">
+                <span class="tab-icon">🏫</span>
+                <span class="tab-label">학원</span>
+            </button>
+            <button class="tab-btn" onclick="showTab('budget')">
+                <span class="tab-icon">💳</span>
+                <span class="tab-label">가계부</span>
+            </button>
+            <button class="tab-btn" onclick="showTab('rewards')">
+                <span class="tab-icon">🎁</span>
+                <span class="tab-label">보상</span>
+            </button>
+            <button class="tab-btn" onclick="showTab('settings')">
+                <span class="tab-icon">⚙️</span>
+                <span class="tab-label">설정</span>
+            </button>
+        </nav>
+
+        <!-- 메인 컨텐츠 -->
+        <main class="main-content">
+            <!-- 학원 탭 -->
+            <div id="academiesTab" class="tab-content active">
+                <div class="content-header">
+                    <h2>학원 목록</h2>
+                    <button class="btn btn-primary" onclick="showAddAcademyModal()">
+                        + 학원 추가
+                    </button>
+                </div>
+                <div id="academiesList" class="academies-list">
+                    <div class="empty-state">
+                        <div class="empty-emoji">🏫</div>
+                        <h3>등록된 학원이 없어요</h3>
+                        <p>학원을 추가하고<br>똑똑한 출석 관리를 시작하세요!</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 가계부 탭 (NEW!) -->
+            <div id="budgetTab" class="tab-content">
+                <div class="content-header">
+                    <h2>학원비 가계부</h2>
+                </div>
+                
+                <!-- 이번 달 총액 -->
+                <div class="budget-summary">
+                    <div class="budget-card">
+                        <div class="budget-label">이번 달 학원비</div>
+                        <div class="budget-amount" id="totalBudget">0원</div>
+                        <div class="budget-count" id="academyCount">0개 학원</div>
+                    </div>
+                </div>
+
+                <!-- 다가오는 결제일 -->
+                <div class="payment-schedule">
+                    <h3>📅 다가오는 결제</h3>
+                    <div id="paymentList" class="payment-list">
+                        <div class="empty-state-small">
+                            결제 예정인 학원비가 없어요
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 월별 통계 -->
+                <div class="budget-stats">
+                    <h3>📊 월별 통계</h3>
+                    <div class="stats-grid" id="budgetStats">
+                        <div class="stat-item">
+                            <div class="stat-label">이번 달</div>
+                            <div class="stat-value" id="thisMonth">0원</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-label">지난 달</div>
+                            <div class="stat-value" id="lastMonth">0원</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 보상 탭 -->
+            <div id="rewardsTab" class="tab-content">
+                <div class="content-header">
+                    <h2>보상</h2>
+                    <button class="btn btn-primary" onclick="showAddRewardModal()">
+                        + 보상 추가
+                    </button>
+                </div>
+                
+                <!-- 포인트 카드 -->
+                <div class="points-card">
+                    <div class="points-label"><span id="currentChildName">자녀</span>의 포인트</div>
+                    <div class="points-value">🏆 <span id="rewardPoints">0</span>P</div>
+                    <div class="points-subtext">열심히 모은 포인트로 원하는 보상을 받아보세요!</div>
+                </div>
+
+                <!-- 보상 목록 -->
+                <div class="rewards-section">
+                    <h3>🎁 받을 수 있는 보상</h3>
+                    <div id="rewardsList" class="rewards-list">
+                        <div class="empty-state-small">
+                            등록된 보상이 없어요
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 받은 보상 -->
+                <div class="rewards-section">
+                    <h3>✅ 이미 받은 보상</h3>
+                    <div id="claimedRewardsList" class="rewards-list claimed">
+                        <div class="empty-state-small">
+                            받은 보상이 없어요
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 설정 탭 -->
+            <div id="settingsTab" class="tab-content">
+                <div class="content-header">
+                    <h2>설정</h2>
+                </div>
+
+                <!-- 구독 정보 -->
+                <div class="settings-section">
+                    <h3>💳 구독 정보</h3>
+                    <div class="subscription-card" id="subscriptionInfo">
+                        <div class="sub-status">🎉 무료 체험 중</div>
+                        <div class="sub-detail">D-<span id="settingsTrialDays">14</span> 남음</div>
+                        <button class="btn btn-primary" onclick="showSubscriptionModal()">
+                            지금 구독하기
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 자녀 관리 -->
+                <div class="settings-section">
+                    <h3>👨‍👩‍👧 자녀 관리</h3>
+                    <div class="menu-list">
+                        <button class="menu-item" onclick="showChildrenManagement()">
+                            <span>자녀 추가/삭제</span>
+                            <span class="menu-arrow">›</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 알림 설정 -->
+                <div class="settings-section">
+                    <h3>🔔 알림 설정</h3>
+                    <div class="menu-list">
+                        <div class="menu-item toggle-item">
+                            <span>출발 알림</span>
+                            <label class="toggle">
+                                <input type="checkbox" id="departureNotif" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="menu-item toggle-item">
+                            <span>도착 알림</span>
+                            <label class="toggle">
+                                <input type="checkbox" id="arrivalNotif" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="menu-item toggle-item">
+                            <span>결제일 알림</span>
+                            <label class="toggle">
+                                <input type="checkbox" id="paymentNotif" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 앱 정보 -->
+                <div class="settings-section">
+                    <h3>ℹ️ 앱 정보</h3>
+                    <div class="menu-list">
+                        <div class="menu-item">
+                            <span>버전 정보</span>
+                            <span class="menu-value">v1.0.0 PWA</span>
+                        </div>
+                        <button class="menu-item" onclick="alert('문의하기 기능 개발 예정')">
+                            <span>문의하기</span>
+                            <span class="menu-arrow">›</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 로그아웃 -->
+                <button class="btn btn-danger logout-btn" onclick="logout()">
+                    로그아웃
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+    
+    <!-- PWA 설치 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(reg => console.log('Service Worker 등록 성공'))
+                    .catch(err => console.log('Service Worker 등록 실패:', err));
+            });
+        }
+    </script>
+</body>
+</html>
