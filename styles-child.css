@@ -1,0 +1,660 @@
+/* 학원가자 - 어린이 앱 스타일 */
+
+:root {
+    --primary-color: #87CEEB; /* 하늘색 */
+    --secondary-color: #FFB6C1; /* 분홍 */
+    --success-color: #98D8C8; /* 민트 */
+    --warning-color: #FFD700; /* 노랑 */
+    --bg-gradient: linear-gradient(135deg, #87CEEB 0%, #FFB6C1 100%);
+    --card-shadow: 0 4px 15px rgba(135, 206, 235, 0.3);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(180deg, #E0F7FF 0%, #FFF0F5 100%);
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* 로딩 화면 */
+.loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--bg-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-content {
+    text-align: center;
+    color: white;
+}
+
+.loading-emoji {
+    font-size: 80px;
+    margin-bottom: 20px;
+}
+
+.bounce {
+    animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-20px); }
+}
+
+.loading-dots {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.loading-dots span {
+    font-size: 20px;
+    animation: blink 1.4s infinite both;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes blink {
+    0%, 80%, 100% { opacity: 0; }
+    40% { opacity: 1; }
+}
+
+/* 앱 컨테이너 */
+.app-container {
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+    position: relative;
+    padding-bottom: 80px;
+}
+
+/* 헤더 */
+.app-header {
+    background: var(--bg-gradient);
+    padding-bottom: 30px;
+    position: relative;
+    overflow: hidden;
+}
+
+.header-wave {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 50px;
+}
+
+.header-wave svg {
+    width: 100%;
+    height: 100%;
+}
+
+.header-content {
+    padding: 20px;
+    position: relative;
+    z-index: 1;
+}
+
+.greeting h1 {
+    color: white;
+    font-size: 28px;
+    text-align: center;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+}
+
+.stats-card {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: var(--card-shadow);
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.stat-icon {
+    font-size: 36px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: bold;
+    background: var(--bg-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #999;
+}
+
+.stat-divider {
+    width: 2px;
+    height: 40px;
+    background: linear-gradient(180deg, transparent, #ddd, transparent);
+}
+
+/* 메인 컨텐츠 */
+.main-content {
+    padding: 20px;
+}
+
+.section-title {
+    font-size: 20px;
+    margin-bottom: 16px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 음성 메시지 섹션 */
+.message-section {
+    margin-bottom: 30px;
+}
+
+.voice-message-card {
+    background: linear-gradient(135deg, #FFE5EC 0%, #FFF0F5 100%);
+    border-radius: 20px;
+    padding: 30px 20px;
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    margin-bottom: 20px;
+}
+
+.voice-hint {
+    font-size: 14px;
+    color: #FF69B4;
+    margin-bottom: 20px;
+    font-weight: 600;
+}
+
+.voice-record-btn {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FF1493 0%, #FF69B4 100%);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(255, 105, 180, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    position: relative;
+    transition: all 0.3s;
+}
+
+.voice-record-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 4px 10px rgba(255, 105, 180, 0.4);
+}
+
+.mic-icon {
+    font-size: 48px;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.recording-wave {
+    position: absolute;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    justify-content: center;
+}
+
+.recording-wave span {
+    width: 4px;
+    height: 20px;
+    background: white;
+    border-radius: 2px;
+    animation: wave 1s ease-in-out infinite;
+}
+
+.recording-wave span:nth-child(1) { animation-delay: 0s; }
+.recording-wave span:nth-child(2) { animation-delay: 0.1s; }
+.recording-wave span:nth-child(3) { animation-delay: 0.2s; }
+.recording-wave span:nth-child(4) { animation-delay: 0.3s; }
+.recording-wave span:nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes wave {
+    0%, 100% { height: 20px; }
+    50% { height: 40px; }
+}
+
+.btn-text {
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.recording-timer {
+    font-size: 18px;
+    font-weight: bold;
+    color: #FF1493;
+    margin-top: 10px;
+}
+
+/* 빠른 메시지 */
+.quick-messages {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+}
+
+.quick-hint {
+    font-size: 14px;
+    color: #999;
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.quick-btn-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.quick-btn {
+    background: linear-gradient(135deg, #F0F8FF 0%, #FFF0F5 100%);
+    border: 2px solid #FFB6C1;
+    border-radius: 16px;
+    padding: 16px 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.quick-btn:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 15px rgba(255, 182, 193, 0.4);
+    border-color: #FF69B4;
+}
+
+.quick-emoji {
+    font-size: 32px;
+    animation: wiggle 2s ease-in-out infinite;
+}
+
+@keyframes wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-10deg); }
+    75% { transform: rotate(10deg); }
+}
+
+.quick-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: #FF69B4;
+}
+
+/* 보낸 메시지 */
+.sent-messages {
+    margin-top: 20px;
+    background: #F8F9FA;
+    border-radius: 16px;
+    padding: 16px;
+}
+
+.sent-title {
+    font-size: 16px;
+    margin-bottom: 12px;
+    color: #666;
+}
+
+.message-item {
+    background: white;
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.message-emoji {
+    font-size: 24px;
+}
+
+.message-content {
+    flex: 1;
+}
+
+.message-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+.message-time {
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
+}
+
+.message-status {
+    font-size: 12px;
+}
+
+/* 학원 목록 */
+.academy-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.academy-card-child {
+    background: white;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: var(--card-shadow);
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    position: relative;
+}
+
+.academy-card-child::before {
+    content: '';
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    right: -3px;
+    bottom: -3px;
+    background: var(--bg-gradient);
+    border-radius: 20px;
+    z-index: -1;
+}
+
+.academy-name-child {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    color: #333;
+}
+
+.academy-info-child {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: #666;
+}
+
+.check-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--bg-gradient);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(135, 206, 235, 0.4);
+    transition: all 0.3s;
+}
+
+.check-btn:active {
+    transform: scale(0.98);
+}
+
+/* 보상 목록 */
+.rewards-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+}
+
+.reward-card-child {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    transition: all 0.3s;
+}
+
+.reward-card-child.can-claim {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+    animation: shine 2s infinite;
+}
+
+@keyframes shine {
+    0%, 100% { box-shadow: 0 4px 15px rgba(255, 215, 0, 0.4); }
+    50% { box-shadow: 0 8px 25px rgba(255, 215, 0, 0.6); }
+}
+
+.reward-name {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.reward-points {
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 12px;
+}
+
+.claim-btn-child {
+    width: 100%;
+    padding: 10px;
+    background: var(--success-color);
+    border: none;
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.claim-btn-child:disabled {
+    background: #CCC;
+    cursor: not-allowed;
+}
+
+/* 하단 네비게이션 */
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-width: 600px;
+    margin: 0 auto;
+    background: white;
+    display: flex;
+    justify-content: space-around;
+    padding: 10px 0;
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+    z-index: 100;
+}
+
+.nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    transition: all 0.3s;
+}
+
+.nav-btn.active .nav-icon {
+    transform: scale(1.2);
+}
+
+.nav-icon {
+    font-size: 24px;
+    transition: all 0.3s;
+}
+
+.nav-label {
+    font-size: 11px;
+    color: #999;
+}
+
+.nav-btn.active .nav-label {
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+/* 성공 모달 */
+.success-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.success-content {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    text-align: center;
+    animation: popIn 0.5s;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.success-emoji {
+    font-size: 80px;
+    margin-bottom: 20px;
+    animation: rotate 1s;
+}
+
+@keyframes rotate {
+    0% { transform: rotate(0deg) scale(0); }
+    100% { transform: rotate(360deg) scale(1); }
+}
+
+.success-content h2 {
+    font-size: 24px;
+    margin-bottom: 12px;
+    color: #333;
+}
+
+.success-content p {
+    font-size: 16px;
+    color: #666;
+}
+
+/* 엄마 목소리 섹션 */
+.parent-voice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.parent-voice-btn {
+    background: linear-gradient(135deg, #DDA0DD 0%, #EE82EE 100%);
+    border: none;
+    border-radius: 16px;
+    padding: 20px;
+    color: white;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(221, 160, 221, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s;
+}
+
+.parent-voice-btn:active {
+    transform: scale(0.98);
+}
+
+.parent-voice-icon {
+    font-size: 32px;
+}
+
+/* 반응형 */
+@media (max-width: 380px) {
+    .quick-btn-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .stats-card {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .stat-divider {
+        width: 80%;
+        height: 2px;
+    }
+}
