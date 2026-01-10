@@ -294,8 +294,15 @@ function renderAcademies() {
                     </div>
                 ` : ''}
                 <div class="academy-actions">
-                    ${academy.voiceMessage ? '<button class="btn-action" onclick="playVoiceMessage(\'' + academy.id + '\')">🎤 엄마 목소리 듣기</button>' : ''}
-                    <button class="btn-action btn-primary" onclick="checkAttendance('${academy.id}')">✅ 출석 체크</button>
+                    <button class="btn-action" onclick="setAcademyLocation('${academy.id}', 'gate')" title="학원 정문 위치 설정">
+                        📍 ${academy.locationGate ? '위치 ✓' : '위치설정'}
+                    </button>
+                    <button class="btn-action" onclick="${academy.voiceMessage ? 'playVoiceMessage' : 'showVoiceRecorder'}('${academy.id}')" title="엄마 목소리">
+                        🎤 ${academy.voiceMessage ? '듣기' : '녹음'}
+                    </button>
+                    <button class="btn-action btn-primary" onclick="checkAttendance('${academy.id}')" title="출석 체크">
+                        ✅ 출석체크
+                    </button>
                 </div>
             </div>
         `;
@@ -954,6 +961,7 @@ async function setAcademyLocation(academyId, locationType) {
         }
         
         saveData();
+        render(); // UI 업데이트
         alert('✅ 위치가 저장되었습니다!');
         
     } catch (error) {
@@ -965,6 +973,22 @@ async function setAcademyLocation(academyId, locationType) {
 // ========================================
 // 🎤 음성 녹음
 // ========================================
+
+// 음성 녹음 인터페이스 표시
+function showVoiceRecorder(academyId) {
+    if (confirm('🎤 엄마의 따뜻한 응원 메시지를 녹음하시겠어요?\n\n예) "학원 가자! 오늘도 화이팅!"')) {
+        startRecording(academyId);
+        
+        // 녹음 중 안내
+        setTimeout(() => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                if (confirm('🔴 녹음 중입니다...\n\n녹음을 중지하시겠어요?')) {
+                    stopRecording();
+                }
+            }
+        }, 3000); // 3초 후 중지 옵션 제공
+    }
+}
 
 let mediaRecorder = null;
 let audioChunks = [];
@@ -990,10 +1014,14 @@ async function startRecording(academyId) {
         
         mediaRecorder.start();
         
-        // UI 업데이트
-        document.getElementById('recordBtn').style.display = 'none';
-        document.getElementById('stopBtn').style.display = 'block';
-        document.getElementById('recordingIndicator').style.display = 'block';
+        // UI 업데이트 (모달 내부에 있는 경우만)
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const indicator = document.getElementById('recordingIndicator');
+        
+        if (recordBtn) recordBtn.style.display = 'none';
+        if (stopBtn) stopBtn.style.display = 'block';
+        if (indicator) indicator.style.display = 'block';
         
     } catch (error) {
         console.error('녹음 시작 실패:', error);
@@ -1006,10 +1034,14 @@ function stopRecording() {
     if (mediaRecorder && mediaRecorder.state === 'recording') {
         mediaRecorder.stop();
         
-        // UI 업데이트
-        document.getElementById('recordBtn').style.display = 'block';
-        document.getElementById('stopBtn').style.display = 'none';
-        document.getElementById('recordingIndicator').style.display = 'none';
+        // UI 업데이트 (모달 내부에 있는 경우만)
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const indicator = document.getElementById('recordingIndicator');
+        
+        if (recordBtn) recordBtn.style.display = 'block';
+        if (stopBtn) stopBtn.style.display = 'none';
+        if (indicator) indicator.style.display = 'none';
     }
 }
 
@@ -1026,6 +1058,7 @@ function saveVoiceMessage(academyId, audioBlob) {
                 recordedAt: new Date().toISOString()
             };
             saveData();
+            render(); // UI 업데이트
             alert('✅ 엄마 목소리가 저장되었습니다! 💕');
         }
     };
