@@ -500,12 +500,180 @@ function showAddChildModal() {
     render();
 }
 
+// 학원 추가 모달 열기
 function showAddAcademyModal() {
-    alert('학원 추가 기능은 개발 중입니다.\n곧 만나요! 🏫');
+    if (!state.currentChildId) {
+        alert('먼저 자녀를 추가해주세요!');
+        return;
+    }
+    
+    // 폼 리셋
+    document.getElementById('academyForm').reset();
+    document.getElementById('editingAcademyId').value = '';
+    document.getElementById('academyModalTitle').textContent = '🏫 학원 추가';
+    document.getElementById('deleteAcademyBtn').style.display = 'none';
+    
+    // 기본값 설정
+    document.getElementById('classTime').value = '16:00';
+    document.getElementById('departureTime').value = '15:30';
+    
+    // 모달 표시
+    document.getElementById('academyModal').style.display = 'flex';
 }
 
+// 학원 수정 모달 열기
 function editAcademy(id) {
-    alert('학원 편집 기능은 개발 중입니다.');
+    const academy = state.academies.find(a => a.id === id);
+    if (!academy) return;
+    
+    // 모달 제목 변경
+    document.getElementById('academyModalTitle').textContent = '✏️ 학원 수정';
+    document.getElementById('deleteAcademyBtn').style.display = 'block';
+    document.getElementById('editingAcademyId').value = id;
+    
+    // 기본 정보
+    document.getElementById('academyName').value = academy.name;
+    document.getElementById('academyAddress').value = academy.address || '';
+    
+    // 수업 일정
+    // 요일 체크박스 초기화
+    for (let i = 0; i < 7; i++) {
+        document.getElementById(`day${i}`).checked = false;
+    }
+    // 저장된 요일 체크
+    academy.schedule.forEach(s => {
+        if (s.enabled) {
+            document.getElementById(`day${s.day}`).checked = true;
+        }
+    });
+    
+    // 시간
+    const firstSchedule = academy.schedule.find(s => s.enabled);
+    if (firstSchedule) {
+        document.getElementById('classTime').value = firstSchedule.time;
+    }
+    document.getElementById('departureTime').value = academy.departureTime;
+    
+    // 학원비
+    document.getElementById('academyFee').value = academy.fee || '';
+    document.getElementById('paymentDay').value = academy.paymentDay || '';
+    
+    // 알림 설정
+    document.getElementById('rainAlert').checked = academy.weatherAlerts?.rain || false;
+    document.getElementById('dustAlert').checked = academy.weatherAlerts?.fineDust || false;
+    
+    // 모달 표시
+    document.getElementById('academyModal').style.display = 'flex';
+}
+
+// 학원 모달 닫기
+function closeAcademyModal() {
+    document.getElementById('academyModal').style.display = 'none';
+}
+
+// 학원 저장 (추가 또는 수정)
+function saveAcademy(event) {
+    event.preventDefault();
+    
+    const editingId = document.getElementById('editingAcademyId').value;
+    const name = document.getElementById('academyName').value.trim();
+    const address = document.getElementById('academyAddress').value.trim();
+    const classTime = document.getElementById('classTime').value;
+    const departureTime = document.getElementById('departureTime').value;
+    const fee = parseInt(document.getElementById('academyFee').value) || null;
+    const paymentDay = parseInt(document.getElementById('paymentDay').value) || null;
+    const rainAlert = document.getElementById('rainAlert').checked;
+    const dustAlert = document.getElementById('dustAlert').checked;
+    
+    // 선택된 요일 수집
+    const selectedDays = [];
+    for (let i = 0; i < 7; i++) {
+        const dayCheckbox = document.getElementById(`day${i}`);
+        if (dayCheckbox.checked) {
+            selectedDays.push(i);
+        }
+    }
+    
+    if (selectedDays.length === 0) {
+        alert('수업 요일을 최소 1개 이상 선택해주세요!');
+        return;
+    }
+    
+    // 스케줄 생성
+    const schedule = selectedDays.map(day => ({
+        day: day,
+        time: classTime,
+        enabled: true
+    }));
+    
+    if (editingId) {
+        // 수정
+        const academy = state.academies.find(a => a.id === editingId);
+        if (academy) {
+            academy.name = name;
+            academy.address = address;
+            academy.schedule = schedule;
+            academy.departureTime = departureTime;
+            academy.fee = fee;
+            academy.paymentDay = paymentDay;
+            academy.weatherAlerts = {
+                rain: rainAlert,
+                fineDust: dustAlert
+            };
+            academy.updatedAt = new Date().toISOString();
+        }
+    } else {
+        // 추가
+        const newAcademy = {
+            id: generateId(),
+            childId: state.currentChildId,
+            name: name,
+            address: address,
+            schedule: schedule,
+            departureTime: departureTime,
+            fee: fee,
+            paymentDay: paymentDay,
+            locationGate: null,
+            locationBus: null,
+            weatherAlerts: {
+                rain: rainAlert,
+                fineDust: dustAlert
+            },
+            createdAt: new Date().toISOString()
+        };
+        
+        state.academies.push(newAcademy);
+        
+        // 첫 학원 등록 시 무료 체험 시작
+        if (state.academies.length === 1 && state.subscription.status === 'trial' && !state.subscription.trialStartDate) {
+            state.subscription.trialStartDate = new Date().toISOString();
+        }
+    }
+    
+    saveData();
+    render();
+    closeAcademyModal();
+    
+    // 성공 메시지
+    const message = editingId ? '학원이 수정되었습니다! ✏️' : '학원이 추가되었습니다! 🎉';
+    alert(message);
+}
+
+// 학원 삭제
+function deleteCurrentAcademy() {
+    const editingId = document.getElementById('editingAcademyId').value;
+    if (!editingId) return;
+    
+    const academy = state.academies.find(a => a.id === editingId);
+    if (!academy) return;
+    
+    if (confirm(`"${academy.name}" 학원을 삭제하시겠어요?\n이 작업은 되돌릴 수 없습니다.`)) {
+        state.academies = state.academies.filter(a => a.id !== editingId);
+        saveData();
+        render();
+        closeAcademyModal();
+        alert('학원이 삭제되었습니다.');
+    }
 }
 
 function showAddRewardModal() {

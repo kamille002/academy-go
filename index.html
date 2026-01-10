@@ -259,6 +259,155 @@
         </main>
     </div>
 
+    <!-- 학원 추가/수정 모달 -->
+    <div id="academyModal" class="modal" style="display: none;">
+        <div class="modal-content academy-modal">
+            <h2 id="academyModalTitle">🏫 학원 추가</h2>
+            
+            <form id="academyForm" onsubmit="saveAcademy(event)">
+                <input type="hidden" id="editingAcademyId">
+                
+                <!-- 기본 정보 -->
+                <div class="form-section">
+                    <h3>📋 기본 정보</h3>
+                    
+                    <div class="form-group">
+                        <label>학원 이름 *</label>
+                        <input type="text" id="academyName" required placeholder="예) 태권도 학원">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>주소</label>
+                        <input type="text" id="academyAddress" placeholder="예) 서울시 강남구">
+                    </div>
+                </div>
+
+                <!-- 수업 일정 -->
+                <div class="form-section">
+                    <h3>📅 수업 일정</h3>
+                    
+                    <div class="form-group">
+                        <label>수업 요일 선택</label>
+                        <div class="day-selector">
+                            <label class="day-btn">
+                                <input type="checkbox" id="day0" value="0">
+                                <span>일</span>
+                            </label>
+                            <label class="day-btn">
+                                <input type="checkbox" id="day1" value="1">
+                                <span>월</span>
+                            </label>
+                            <label class="day-btn">
+                                <input type="checkbox" id="day2" value="2">
+                                <span>화</span>
+                            </label>
+                            <label class="day-btn">
+                                <input type="checkbox" id="day3" value="3">
+                                <span>수</span>
+                            </label>
+                            <label class="day-btn">
+                                <input type="checkbox" id="day4" value="4">
+                                <span>목</span>
+                            </label>
+                            <label class="day-btn">
+                                <input type="checkbox" id="day5" value="5">
+                                <span>금</span>
+                            </label>
+                            <label class="day-btn">
+                                <input type="checkbox" id="day6" value="6">
+                                <span>토</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>수업 시작 시간</label>
+                        <input type="time" id="classTime" value="16:00">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>집 출발 시간</label>
+                        <input type="time" id="departureTime" value="15:30">
+                    </div>
+                </div>
+
+                <!-- 학원비 -->
+                <div class="form-section">
+                    <h3>💰 학원비</h3>
+                    
+                    <div class="form-group">
+                        <label>월 학원비 (원)</label>
+                        <input type="number" id="academyFee" placeholder="예) 150000" min="0" step="1000">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>결제일 (매월)</label>
+                        <select id="paymentDay">
+                            <option value="">선택 안함</option>
+                            <option value="1">1일</option>
+                            <option value="2">2일</option>
+                            <option value="3">3일</option>
+                            <option value="4">4일</option>
+                            <option value="5">5일</option>
+                            <option value="6">6일</option>
+                            <option value="7">7일</option>
+                            <option value="8">8일</option>
+                            <option value="9">9일</option>
+                            <option value="10">10일</option>
+                            <option value="11">11일</option>
+                            <option value="12">12일</option>
+                            <option value="13">13일</option>
+                            <option value="14">14일</option>
+                            <option value="15">15일</option>
+                            <option value="16">16일</option>
+                            <option value="17">17일</option>
+                            <option value="18">18일</option>
+                            <option value="19">19일</option>
+                            <option value="20">20일</option>
+                            <option value="21">21일</option>
+                            <option value="22">22일</option>
+                            <option value="23">23일</option>
+                            <option value="24">24일</option>
+                            <option value="25">25일</option>
+                            <option value="26">26일</option>
+                            <option value="27">27일</option>
+                            <option value="28">28일</option>
+                            <option value="29">29일</option>
+                            <option value="30">30일</option>
+                            <option value="31">31일</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 알림 설정 -->
+                <div class="form-section">
+                    <h3>🔔 알림 설정</h3>
+                    
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="rainAlert">
+                            <span>☔ 비/눈 올 때 알림</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-group checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="dustAlert">
+                            <span>😷 미세먼지 나쁠 때 알림</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 버튼 -->
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeAcademyModal()">취소</button>
+                    <button type="button" class="btn btn-danger" id="deleteAcademyBtn" onclick="deleteCurrentAcademy()" style="display: none;">삭제</button>
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="app.js"></script>
     
