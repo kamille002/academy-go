@@ -5,9 +5,12 @@
 // ========================================
 
 const SUPABASE_URL = 'https://pvbfblbivboypjsnzmkj.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_7Kt6XwlLQG2xxlO9ABhG3Q_cyN-1i6_';
+const SUPABASE_ANON_KEY = 'sb_publishable_7Kt6XwlLQG2xxlO9ABhG3Q_cyN-1i6_';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabaseClient;
+if (typeof window.supabase !== 'undefined') {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
 
 // 데이터 저장소 (LocalStorage - 임시 사용)
 const Storage = {
@@ -60,7 +63,7 @@ async function initializeFamily() {
         
         if (savedFamilyId) {
             // 기존 가족 가져오기
-            const { data, error } = await supabase
+            const { data, error } = await supabaseClient
                 .from('families')
                 .select('*')
                 .eq('id', savedFamilyId)
@@ -76,7 +79,7 @@ async function initializeFamily() {
         
         // 새 가족 생성
         const code = generateFamilyCode();
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('families')
             .insert([{ code: code }])
             .select()
