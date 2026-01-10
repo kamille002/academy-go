@@ -808,5 +808,171 @@ function showSubscriptionModal() {
     alert('구독 기능은 개발 중입니다.\n\n플랜:\n- 1자녀: 1,000원/월\n- 다자녀: 2,000원/월\n\n결제 수단: 토스페이, 카카오페이');
 }
 
+// ========================================
+// PWA 설치 기능
+// ========================================
+
+let deferredPrompt;
+let installSource = 'unknown'; // 설치 소스 추적
+
+// beforeinstallprompt 이벤트 캐치
+window.addEventListener('beforeinstallprompt', (e) => {
+    console.log('PWA 설치 가능!');
+    
+    // 기본 브라우저 프롬프트 방지
+    e.preventDefault();
+    
+    // 나중에 사용하기 위해 이벤트 저장
+    deferredPrompt = e;
+    
+    // 설치 배너 표시 (3초 후)
+    setTimeout(() => {
+        showInstallBanner();
+    }, 3000);
+    
+    // 설정에 설치 메뉴 표시
+    const installMenuItem = document.getElementById('installMenuItem');
+    if (installMenuItem) {
+        installMenuItem.style.display = 'flex';
+    }
+});
+
+// 설치 배너 표시
+function showInstallBanner() {
+    const banner = document.getElementById('installBanner');
+    if (banner && deferredPrompt) {
+        banner.style.display = 'block';
+        
+        // 설치 버튼에 이벤트 리스너 추가
+        const installBtn = document.getElementById('installBtn');
+        if (installBtn) {
+            installBtn.onclick = () => {
+                installSource = 'banner';
+                installPWA();
+            };
+        }
+    }
+}
+
+// 설치 배너 닫기
+function closeInstallBanner() {
+    document.getElementById('installBanner').style.display = 'none';
+    
+    // 로컬스토리지에 배너 닫음 기록
+    Storage.set('installBannerClosed', true);
+}
+
+// 설치 프롬프트 모달 표시
+function showInstallPrompt() {
+    // iOS인 경우
+    if (isIOS()) {
+        document.getElementById('iosInstallModal').style.display = 'flex';
+        return;
+    }
+    
+    // Android/Desktop
+    if (deferredPrompt) {
+        document.getElementById('installPromptModal').style.display = 'flex';
+        installSource = 'settings';
+    } else {
+        // 이미 설치되었거나 설치 불가능
+        if (isStandalone()) {
+            alert('이미 설치되어 있습니다! 👍');
+        } else {
+            alert('이 브라우저에서는 설치가 지원되지 않습니다.\n\nChrome 또는 Edge 브라우저를 사용해주세요.');
+        }
+    }
+}
+
+// 설치 프롬프트 모달 닫기
+function closeInstallPrompt() {
+    document.getElementById('installPromptModal').style.display = 'none';
+}
+
+// iOS 설치 모달 닫기
+function closeIOSInstallModal() {
+    document.getElementById('iosInstallModal').style.display = 'none';
+}
+
+// PWA 설치 실행
+async function installPWA() {
+    if (!deferredPrompt) {
+        alert('설치할 수 없습니다.');
+        return;
+    }
+    
+    // 설치 프롬프트 표시
+    deferredPrompt.prompt();
+    
+    // 사용자 응답 대기
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    console.log(`설치 결과: ${outcome} (소스: ${installSource})`);
+    
+    if (outcome === 'accepted') {
+        console.log('✅ PWA 설치 완료!');
+        
+        // 배너 숨기기
+        closeInstallBanner();
+        closeInstallPrompt();
+        
+        // 성공 메시지
+        setTimeout(() => {
+            alert('🎉 설치 완료!\n\n홈 화면에서 "학원가자" 앱을 찾아보세요!');
+        }, 500);
+    } else {
+        console.log('❌ 사용자가 설치 취소');
+    }
+    
+    // 프롬프트 초기화
+    deferredPrompt = null;
+}
+
+// iOS 감지
+function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+// 이미 설치되었는지 확인
+function isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches || 
+           window.navigator.standalone === true;
+}
+
+// 앱 설치 완료 이벤트
+window.addEventListener('appinstalled', (e) => {
+    console.log('✅ PWA가 성공적으로 설치되었습니다!');
+    
+    // 설치 메뉴 숨기기
+    const installMenuItem = document.getElementById('installMenuItem');
+    if (installMenuItem) {
+        installMenuItem.style.display = 'none';
+    }
+});
+
+// 페이지 로드 시 설치 상태 확인
+window.addEventListener('load', () => {
+    // 이미 설치된 경우 설치 메뉴 숨기기
+    if (isStandalone()) {
+        const installMenuItem = document.getElementById('installMenuItem');
+        if (installMenuItem) {
+            installMenuItem.style.display = 'none';
+        }
+        
+        const installBanner = document.getElementById('installBanner');
+        if (installBanner) {
+            installBanner.style.display = 'none';
+        }
+    }
+    
+    // iOS에서 설치 메뉴 항상 표시
+    if (isIOS() && !isStandalone()) {
+        const installMenuItem = document.getElementById('installMenuItem');
+        if (installMenuItem) {
+            installMenuItem.style.display = 'flex';
+        }
+    }
+});
+
 // 앱 시작
 document.addEventListener('DOMContentLoaded', init);
