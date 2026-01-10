@@ -763,6 +763,34 @@ function showSubscriptionModal() {
     alert('구독 기능은 개발 중입니다.\n\n플랜:\n- 1자녀: 1,000원/월\n- 다자녀: 2,000원/월\n\n결제 수단: 토스페이, 카카오페이');
 }
 
+// 홈 화면 추가 가이드
+function showInstallGuide() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    let message = '📱 홈 화면에 추가하기\n\n';
+    
+    if (isIOS) {
+        message += '📱 iPhone/iPad:\n';
+        message += '1️⃣ 하단의 "공유" 버튼 (⬆️) 클릭\n';
+        message += '2️⃣ "홈 화면에 추가" 선택\n';
+        message += '3️⃣ "추가" 버튼 클릭\n';
+    } else if (isAndroid) {
+        message += '📱 Android:\n';
+        message += '1️⃣ 브라우저 메뉴 (⋮) 열기\n';
+        message += '2️⃣ "홈 화면에 추가" 선택\n';
+        message += '3️⃣ "추가" 버튼 클릭\n';
+    } else {
+        message += '💻 데스크톱:\n';
+        message += '1️⃣ 주소창 오른쪽 아이콘 클릭\n';
+        message += '2️⃣ "설치" 버튼 클릭\n';
+    }
+    
+    message += '\n✨ 앱처럼 빠르게 사용하세요!';
+    
+    alert(message);
+}
+
 // ========================================
 // 🌤️ 날씨 API
 // ========================================
