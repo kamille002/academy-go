@@ -1,6 +1,15 @@
 // 학원가자 PWA - 메인 JavaScript
 
-// 데이터 저장소 (LocalStorage)
+// ========================================
+// Supabase 초기화
+// ========================================
+
+const SUPABASE_URL = 'https://pvbfblbivboypjsnzmkj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_7Kt6XwlLQG2xxlO9ABhG3Q_cyN-1i6_';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 데이터 저장소 (LocalStorage - 임시 사용)
 const Storage = {
     get(key) {
         const data = localStorage.getItem(key);
@@ -24,11 +33,85 @@ let state = {
         status: 'trial', // trial, active, expired
         trialStartDate: null,
         planType: null // single, multi
-    }
+    },
+    familyId: null, // 가족 ID
+    familyCode: null // 가족 코드
 };
 
+// ========================================
+// 가족 코드 관리
+// ========================================
+
+// 6자리 랜덤 코드 생성
+function generateFamilyCode() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 문자 제외
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+// 가족 생성 또는 가져오기
+async function initializeFamily() {
+    try {
+        // LocalStorage에서 familyId 확인
+        const savedFamilyId = Storage.get('familyId');
+        
+        if (savedFamilyId) {
+            // 기존 가족 가져오기
+            const { data, error } = await supabase
+                .from('families')
+                .select('*')
+                .eq('id', savedFamilyId)
+                .single();
+            
+            if (data) {
+                state.familyId = data.id;
+                state.familyCode = data.code;
+                console.log('가족 코드:', data.code);
+                return;
+            }
+        }
+        
+        // 새 가족 생성
+        const code = generateFamilyCode();
+        const { data, error } = await supabase
+            .from('families')
+            .insert([{ code: code }])
+            .select()
+            .single();
+        
+        if (error) throw error;
+        
+        state.familyId = data.id;
+        state.familyCode = data.code;
+        Storage.set('familyId', data.id);
+        
+        console.log('✅ 가족 생성 완료! 코드:', data.code);
+        
+        // 코드 표시
+        alert(`🎉 가족 코드가 생성되었어요!\n\n코드: ${data.code}\n\n자녀 앱에서 이 코드를 입력하세요!`);
+        
+    } catch (error) {
+        console.error('가족 초기화 실패:', error);
+    }
+}
+
+// 가족 코드 보기
+function showFamilyCode() {
+    if (state.familyCode) {
+        alert(`👨‍👩‍👧 가족 코드\n\n${state.familyCode}\n\n자녀 앱에서 이 코드를 입력하면 연결됩니다!`);
+    } else {
+        alert('가족 코드를 생성 중입니다...');
+    }
+}
+
 // 초기화
-function init() {
+async function init() {
+    // 가족 초기화 (Supabase)
+    await initializeFamily();
+    
     loadData();
     checkPaymentAlerts();
     render();
@@ -165,6 +248,7 @@ function render() {
     renderBudget();
     renderRewards();
     renderSettings();
+    checkChildMessages(); // 메시지 체크
 }
 
 // 자녀 선택기 렌더
@@ -796,6 +880,108 @@ function showInstallGuide() {
     message += '\n✨ 앱처럼 빠르게 사용하세요!';
     
     alert(message);
+}
+
+// ========================================
+// 💌 자녀 메시지 기능
+// ========================================
+
+// 메시지 확인 및 알림 표시
+function checkChildMessages() {
+    const messages = Storage.get('childMessages') || [];
+    const unreadMessages = messages.filter(m => m.childId === state.currentChildId && !m.read);
+    
+    const messageBtn = document.getElementById('messageBtn');
+    const messageCount = document.getElementById('messageCount');
+    
+    if (unreadMessages.length > 0) {
+        messageCount.textContent = unreadMessages.length;
+        messageCount.style.display = 'block';
+    } else {
+        messageCount.style.display = 'none';
+    }
+}
+
+// 자녀 메시지 모달 표시
+function showChildMessages() {
+    const currentChild = getCurrentChild();
+    if (!currentChild) return;
+    
+    document.getElementById('currentChildNameMsg').textContent = currentChild.name;
+    
+    const messages = Storage.get('childMessages') || [];
+    const childMessages = messages
+        .filter(m => m.childId === state.currentChildId)
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    const container = document.getElementById('childMessagesList');
+    
+    if (childMessages.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">아직 받은 메시지가 없어요</p>';
+    } else {
+        container.innerHTML = childMessages.map(msg => {
+            const date = new Date(msg.timestamp);
+            const timeStr = date.toLocaleString('ko-KR');
+            
+            return `
+                <div class="child-message-item ${msg.read ? 'read' : 'unread'}">
+                    <div class="message-header">
+                        <span class="message-type-icon">${msg.type === 'voice' ? '🎤' : msg.emoji}</span>
+                        <span class="message-time">${timeStr}</span>
+                    </div>
+                    <div class="message-body">
+                        ${msg.type === 'voice' 
+                            ? `<button class="btn-play-msg" onclick="playChildVoice('${msg.id}')">▶️ 음성 메시지 듣기</button>`
+                            : `<p class="message-text">${msg.content}</p>`
+                        }
+                    </div>
+                    ${!msg.read ? '<button class="btn-mark-read" onclick="markMessageRead(\'' + msg.id + '\')">읽음 표시</button>' : ''}
+                </div>
+            `;
+        }).join('');
+    }
+    
+    document.getElementById('childMessagesModal').style.display = 'flex';
+    
+    // 모든 메시지 읽음 처리 (자동)
+    childMessages.forEach(msg => {
+        if (!msg.read) {
+            msg.read = true;
+        }
+    });
+    Storage.set('childMessages', messages);
+    checkChildMessages();
+}
+
+// 자녀 음성 메시지 재생
+function playChildVoice(messageId) {
+    const messages = Storage.get('childMessages') || [];
+    const message = messages.find(m => m.id === messageId);
+    
+    if (!message || !message.content) {
+        alert('음성 메시지를 찾을 수 없어요!');
+        return;
+    }
+    
+    const audio = new Audio(message.content);
+    audio.play();
+}
+
+// 메시지 읽음 표시
+function markMessageRead(messageId) {
+    const messages = Storage.get('childMessages') || [];
+    const message = messages.find(m => m.id === messageId);
+    
+    if (message) {
+        message.read = true;
+        Storage.set('childMessages', messages);
+        showChildMessages(); // 다시 렌더링
+    }
+}
+
+// 자녀 메시지 모달 닫기
+function closeChildMessagesModal() {
+    document.getElementById('childMessagesModal').style.display = 'none';
 }
 
 // ========================================
