@@ -7,7 +7,11 @@
 const SUPABASE_URL = 'https://pvbfblbivboypjsnzmkj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_7Kt6XwlLQG2xxlO9ABhG3Q_cyN-1i6_';
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Supabase 클라이언트 (전역)
+let supabaseClient;
+if (typeof window.supabase !== 'undefined') {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+}
 
 // Storage (부모 앱과 동일한 데이터 사용)
 const Storage = {
@@ -44,7 +48,7 @@ async function connectFamily() {
     
     try {
         // 코드로 가족 찾기
-        const { data: family, error } = await supabase
+        const { data: family, error } = await supabaseClient
             .from('families')
             .select('*')
             .eq('code', code)
@@ -59,7 +63,7 @@ async function connectFamily() {
         Storage.set('familyId', familyId);
         
         // 가족의 자녀 목록 가져오기
-        const { data: children, error: childError } = await supabase
+        const { data: children, error: childError } = await supabaseClient
             .from('children')
             .select('*')
             .eq('family_id', familyId);
@@ -140,7 +144,7 @@ async function init() {
 async function loadChildData() {
     try {
         // 자녀 정보 가져오기
-        const { data: child, error: childError } = await supabase
+        const { data: child, error: childError } = await supabaseClient
             .from('children')
             .select('*')
             .eq('id', currentChildId)
