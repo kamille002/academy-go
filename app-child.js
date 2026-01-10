@@ -64,8 +64,8 @@ function render() {
     const attendanceRate = calculateAttendanceRate();
     document.getElementById('attendanceRate').textContent = attendanceRate;
     
-    // 학원 목록 렌더
-    renderAcademies();
+    // 오늘의 학원 렌더 (최우선!)
+    renderTodayAcademies();
     
     // 보상 목록 렌더
     renderRewards();
@@ -75,6 +75,9 @@ function render() {
     
     // 보낸 메시지 렌더
     renderSentMessages();
+    
+    // GPS 업데이트 시작
+    startGPSTracking();
 }
 
 // 출석률 계산
@@ -112,39 +115,309 @@ function calculateAttendanceRate() {
     return Math.round((totalAttended / totalExpected) * 100);
 }
 
-// 학원 목록 렌더
-function renderAcademies() {
+// ========================================
+// 오늘의 학원 렌더링
+// ========================================
+
+function renderTodayAcademies() {
     const academies = Storage.get('academies') || [];
     const childAcademies = academies.filter(a => a.childId === currentChildId);
-    const container = document.getElementById('academyList');
+    const container = document.getElementById('todayAcademiesList');
     
-    if (childAcademies.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #999;">아직 등록된 학원이 없어요!</p>';
+    // 오늘 요일 (0=일요일)
+    const today = new Date().getDay();
+    
+    // 오늘 가야 할 학원 필터링
+    const todayAcademies = childAcademies.filter(academy => {
+        return academy.schedule && academy.schedule.some(s => s.enabled && s.day === today);
+    });
+    
+    if (todayAcademies.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #999;">
+                <div style="font-size: 48px; margin-bottom: 12px;">🎉</div>
+                <p style="font-size: 18px; font-weight: 600;">오늘은 학원 없는 날!</p>
+                <p style="font-size: 14px; margin-top: 8px;">푹 쉬세요! 😊</p>
+            </div>
+        `;
         return;
     }
     
-    container.innerHTML = childAcademies.map(academy => {
-        const dayLabels = academy.schedule
-            .filter(s => s.enabled)
-            .map(s => ['일', '월', '화', '수', '목', '금', '토'][s.day])
-            .join(', ');
+    container.innerHTML = todayAcademies.map(academy => {
+        const todaySchedule = academy.schedule.find(s => s.enabled && s.day === today);
+        const timeUntil = getTimeUntil(academy.departureTime);
+        const alreadyArrived = checkIfArrived(academy);
         
         return `
-            <div class="academy-card-child">
-                <div class="academy-name-child">🏫 ${academy.name}</div>
-                <div class="academy-info-child">
-                    <div>📅 ${dayLabels}</div>
-                    <div>⏰ ${academy.departureTime} 출발</div>
+            <div class="today-academy-card" data-academy-id="${academy.id}">
+                <div class="academy-header">
+                    <div class="academy-name-today">🏫 ${academy.name}</div>
+                    ${timeUntil ? `<div class="time-until">${timeUntil}</div>` : ''}
                 </div>
-                <button class="check-btn" onclick="checkAttendance('${academy.id}')">
-                    ✅ 출석 체크하기!
+                
+                <div class="academy-schedule">
+                    <div class="schedule-row">
+                        <span class="schedule-icon">🚀</span>
+                        <span><span class="schedule-time">${academy.departureTime}</span> 출발</span>
+                    </div>
+                    <div class="schedule-row">
+                        <span class="schedule-icon">📚</span>
+                        <span><span class="schedule-time">${todaySchedule.time}</span> 수업 시작</span>
+                    </div>
+                </div>
+                
+                <button 
+                    class="arrival-btn ${alreadyArrived ? 'completed' : 'inactive'}" 
+                    id="arrivalBtn_${academy.id}"
+                    onclick="confirmArrival('${academy.id}')"
+                    ${alreadyArrived ? 'disabled' : ''}
+                >
+                    <span class="arrival-icon">${alreadyArrived ? '✅' : '📍'}</span>
+                    <span>${alreadyArrived ? '도착 완료!' : '도착했어요!'}</span>
                 </button>
+                
+                <div class="gps-status" id="gpsStatus_${academy.id}">
+                    ${alreadyArrived ? '오늘 출석 완료 🎉' : 'GPS 확인 중...'}
+                </div>
+                <div class="distance-info" id="distance_${academy.id}"></div>
             </div>
         `;
     }).join('');
 }
 
+// 남은 시간 계산
+function getTimeUntil(departureTime) {
+    const now = new Date();
+    const [hours, minutes] = departureTime.split(':').map(Number);
+    
+    const departure = new Date();
+    departure.setHours(hours, minutes, 0);
+    
+    const diff = departure - now;
+    
+    if (diff < 0) {
+        return null; // 이미 지남
+    }
+    
+    const minutesLeft = Math.floor(diff / 60000);
+    
+    if (minutesLeft < 15) {
+        return `${minutesLeft}분 후 출발!`;
+    } else if (minutesLeft < 60) {
+        return `${minutesLeft}분 남음`;
+    } else {
+        const hoursLeft = Math.floor(minutesLeft / 60);
+        return `${hoursLeft}시간 남음`;
+    }
+}
+
+// 오늘 이미 도착했는지 확인
+function checkIfArrived(academy) {
+    if (!academy.attendance) return false;
+    
+    const today = new Date().toISOString().split('T')[0];
+    return academy.attendance.some(a => a.date === today);
+}
+
+// ========================================
+// GPS 추적 및 도착 확인
+// ========================================
+
+let gpsWatchId = null;
+let currentPosition = null;
+
+function startGPSTracking() {
+    if (!navigator.geolocation) {
+        console.log('GPS를 지원하지 않는 기기입니다');
+        return;
+    }
+    
+    // GPS 추적 시작
+    gpsWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+            currentPosition = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude
+            };
+            updateArrivalButtons();
+        },
+        (error) => {
+            console.error('GPS 에러:', error);
+        },
+        {
+            enableHighAccuracy: true,
+            maximumAge: 30000,
+            timeout: 27000
+        }
+    );
+}
+
+// 도착 버튼 상태 업데이트
+function updateArrivalButtons() {
+    if (!currentPosition) return;
+    
+    const academies = Storage.get('academies') || [];
+    const childAcademies = academies.filter(a => a.childId === currentChildId);
+    
+    childAcademies.forEach(academy => {
+        if (!academy.locationGate) return;
+        
+        const alreadyArrived = checkIfArrived(academy);
+        if (alreadyArrived) return;
+        
+        const distance = calculateDistance(
+            currentPosition.latitude,
+            currentPosition.longitude,
+            academy.locationGate.lat,
+            academy.locationGate.lon
+        );
+        
+        const btn = document.getElementById(`arrivalBtn_${academy.id}`);
+        const statusEl = document.getElementById(`gpsStatus_${academy.id}`);
+        const distanceEl = document.getElementById(`distance_${academy.id}`);
+        
+        if (!btn) return;
+        
+        // 거리 표시
+        if (distanceEl) {
+            distanceEl.textContent = `현재 거리: ${Math.round(distance)}m`;
+        }
+        
+        if (distance <= 50) {
+            // 50m 이내 - 활성화!
+            btn.className = 'arrival-btn active';
+            btn.disabled = false;
+            if (statusEl) {
+                statusEl.textContent = '✅ 버튼을 눌러주세요!';
+                statusEl.style.color = '#4CAF50';
+                statusEl.style.fontWeight = 'bold';
+            }
+        } else {
+            // 50m 밖 - 비활성
+            btn.className = 'arrival-btn inactive';
+            btn.disabled = true;
+            if (statusEl) {
+                statusEl.textContent = '학원에 가까워지면 버튼이 활성화돼요';
+                statusEl.style.color = '#999';
+            }
+        }
+    });
+}
+
+// 도착 확인
+async function confirmArrival(academyId) {
+    const academies = Storage.get('academies') || [];
+    const academy = academies.find(a => a.id === academyId);
+    
+    if (!academy) return;
+    
+    if (!currentPosition) {
+        alert('📍 GPS 위치를 확인 중이에요!\n잠시만 기다려주세요.');
+        return;
+    }
+    
+    if (!academy.locationGate) {
+        alert('🗺️ 학원 위치가 설정되지 않았어요!\n부모님께 말씀드려주세요!');
+        return;
+    }
+    
+    const distance = calculateDistance(
+        currentPosition.latitude,
+        currentPosition.longitude,
+        academy.locationGate.lat,
+        academy.locationGate.lon
+    );
+    
+    if (distance > 50) {
+        alert(`📍 조금 더 가까이 가주세요!\n\n현재 거리: ${Math.round(distance)}m\n(50m 이내에서 가능)`);
+        return;
+    }
+    
+    // 출석 기록
+    const now = new Date();
+    const arrivalTime = now.toTimeString().split(' ')[0].substring(0, 5);
+    
+    // 포인트 계산
+    const scheduledTime = academy.schedule.find(s => s.day === now.getDay());
+    let points = 0;
+    
+    if (scheduledTime) {
+        const scheduledMinutes = convertTimeToMinutes(scheduledTime.time);
+        const arrivalMinutes = convertTimeToMinutes(arrivalTime);
+        const diff = scheduledMinutes - arrivalMinutes;
+        
+        if (diff >= 10) points = 10;
+        else if (diff >= 5) points = 3;
+        else if (diff >= 0) points = 2;
+    }
+    
+    // 출석 기록 저장
+    if (!academy.attendance) academy.attendance = [];
+    academy.attendance.push({
+        date: now.toISOString().split('T')[0],
+        time: arrivalTime,
+        distance: Math.round(distance),
+        points: points
+    });
+    
+    // 포인트 적립
+    const children = Storage.get('children') || [];
+    const child = children.find(c => c.id === currentChildId);
+    if (child) {
+        child.totalPoints = (child.totalPoints || 0) + points;
+        currentChild = child;
+    }
+    
+    Storage.set('academies', academies);
+    Storage.set('children', children);
+    
+    // 성공 알림
+    showSuccessModal('🎉 도착 완료!', `+${points}P 받았어요!\n잘했어요! 👏`);
+    
+    // 부모에게 도착 메시지 자동 전송
+    sendArrivalMessage(academy.name, arrivalTime);
+    
+    render();
+}
+
+// 도착 메시지 자동 전송
+function sendArrivalMessage(academyName, arrivalTime) {
+    const message = {
+        id: generateId(),
+        childId: currentChildId,
+        childName: currentChild.name,
+        type: 'arrival',
+        emoji: '🏫',
+        content: `${academyName}에 ${arrivalTime}에 도착했어요!`,
+        timestamp: new Date().toISOString(),
+        read: false
+    };
+    
+    let messages = Storage.get('childMessages') || [];
+    messages.push(message);
+    Storage.set('childMessages', messages);
+}
+
+// ========================================
+// 섹션 접기/펼치기
+// ========================================
+
+function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    const header = section.previousElementSibling;
+    
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        header.classList.add('open');
+    } else {
+        section.style.display = 'none';
+        header.classList.remove('open');
+    }
+}
+
+// ========================================
 // 보상 목록 렌더
+// ========================================
 function renderRewards() {
     const rewards = Storage.get('rewards') || [];
     const childRewards = rewards.filter(r => r.childId === currentChildId && !r.claimed);
