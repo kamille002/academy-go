@@ -150,23 +150,28 @@ async function init() {
         document.getElementById('loadingScreen').style.display = 'none';
     }, 1000);
     
-    // 가족 ID와 자녀 ID 확인
+    // 강제 체크: familyId 없으면 무조건 코드 입력
     const familyId = Storage.get('familyId');
     const savedChildId = Storage.get('currentChildId');
     
-    // 가족 연결 안 됨 → 코드 입력 모달
-    if (!familyId) {
+    console.log('초기화:', { familyId, savedChildId });
+    
+    // 가족 ID 없음 → 코드 입력 모달 (최우선!)
+    if (!familyId || familyId === null || familyId === 'null' || familyId === '') {
+        console.log('→ 가족 코드 입력 필요');
         document.getElementById('familyCodeModal').style.display = 'flex';
         return;
     }
     
-    // 자녀 선택 안 됨 → 자녀 선택 필요
-    if (!savedChildId) {
+    // 자녀 ID 없음 → 자녀 선택
+    if (!savedChildId || savedChildId === null || savedChildId === 'null' || savedChildId === '') {
+        console.log('→ 자녀 선택 필요');
         await loadChildrenList();
         return;
     }
     
     // 정상: 데이터 로드
+    console.log('→ 정상 로드');
     currentChildId = savedChildId;
     loadChildData();
     render();
