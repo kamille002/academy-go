@@ -19,34 +19,195 @@ let audioChunks = [];
 let recordingStartTime = null;
 let recordingTimer = null;
 
-// 초기화
-function init() {
+// ========================================
+// 가족 연결 기능
+// ========================================
+
+// 가족 코드로 연결
+async function connectFamily() {
+    const code = document.getElementById('familyCodeInput').value.trim().toUpperCase();
+    
+    if (code.length !== 6) {
+        alert('6자리 코드를 입력해주세요!');
+        return;
+    }
+    
+    try {
+        // Supabase에서 코드로 가족 찾기
+        if (supabaseClient) {
+            const { data: family, error } = await supabaseClient
+                .from('families')
+                .select('*')
+                .eq('code', code)
+                .single();
+            
+            if (error || !family) {
+                alert('❌ 코드를 찾을 수 없어요!\n부모님께 코드를 다시 확인해주세요.');
+                return;
+            }
+            
+            // 가족 ID 저장
+            Storage.set('familyId', family.id);
+            
+            // 모달 닫기
+            document.getElementById('familyCodeModal').style.display = 'none';
+            
+            // 자녀 목록 불러오기
+            await loadChildrenList();
+            
+        } else {
+            // Supabase 없으면 LocalStorage로 폴백
+            alert('⚠️ 온라인 연결이 필요해요!\n인터넷 연결을 확인해주세요.');
+        }
+        
+    } catch (error) {
+        console.error('가족 연결 실패:', error);
+        alert('연결에 실패했어요. 다시 시도해주세요!');
+    }
+}
+
+// 자녀 목록 불러오기
+async function loadChildrenList() {
+    const familyId = Storage.get('familyId');
+    
+    if (!familyId) {
+        document.getElementById('familyCodeModal').style.display = 'flex';
+        return;
+    }
+    
+    try {
+        if (supabaseClient) {
+            // Supabase에서 자녀 목록 가져오기
+            const { data: children, error } = await supabaseClient
+                .from('children')
+                .select('*')
+                .eq('family_id', familyId);
+            
+            if (error) throw error;
+            
+            if (!children || children.length === 0) {
+                alert('❌ 등록된 자녀가 없어요!\n부모님께 먼저 자녀를 등록해달라고 하세요.');
+                return;
+            }
+            
+            // 자녀 선택 모달 표시
+            showChildSelectModal(children);
+            
+        } else {
+            // 폴백: LocalStorage
+            const children = Storage.get('children') || [];
+            if (children.length > 0) {
+                showChildSelectModal(children);
+            } else {
+                alert('먼저 부모 앱에서 자녀를 등록해주세요!');
+            }
+        }
+        
+    } catch (error) {
+        console.error('자녀 목록 로드 실패:', error);
+        alert('자녀 목록을 불러올 수 없어요!');
+    }
+}
+
+// 자녀 선택 모달 표시
+function showChildSelectModal(children) {
+    const container = document.getElementById('childSelectList');
+    
+    container.innerHTML = children.map(child => `
+        <button 
+            onclick="selectChild('${child.id}')" 
+            style="width: 100%; padding: 20px; margin-bottom: 12px; background: linear-gradient(135deg, #87CEEB 0%, #FFB6C1 100%); border: none; border-radius: 16px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(135, 206, 235, 0.3);"
+        >
+            👤 ${child.name}
+        </button>
+    `).join('');
+    
+    document.getElementById('childSelectModal').style.display = 'flex';
+}
+
+// 자녀 선택
+function selectChild(childId) {
+    currentChildId = childId;
+    Storage.set('currentChildId', childId);
+    
+    // 모달 닫기
+    document.getElementById('childSelectModal').style.display = 'none';
+    
+    // 데이터 로드
     loadChildData();
     render();
     
+    // 환영 메시지
+    setTimeout(() => {
+        showSuccessModal('✅ 연결 완료!', '환영합니다! 🎉');
+    }, 300);
+}
+
+// 초기화
+async function init() {
     // 로딩 화면 숨기기
     setTimeout(() => {
         document.getElementById('loadingScreen').style.display = 'none';
     }, 1000);
-}
-
-// 자녀 데이터 로드
-function loadChildData() {
-    // 현재 자녀 ID 가져오기 (부모 앱에서 설정한 것)
-    currentChildId = Storage.get('currentChildId');
     
-    if (!currentChildId) {
-        alert('먼저 부모 앱에서 자녀를 등록해주세요!');
+    // 가족 ID와 자녀 ID 확인
+    const familyId = Storage.get('familyId');
+    const savedChildId = Storage.get('currentChildId');
+    
+    // 가족 연결 안 됨 → 코드 입력 모달
+    if (!familyId) {
+        document.getElementById('familyCodeModal').style.display = 'flex';
         return;
     }
     
-    // 자녀 정보
-    const children = Storage.get('children') || [];
-    currentChild = children.find(c => c.id === currentChildId);
-    
-    if (!currentChild) {
-        alert('자녀 정보를 찾을 수 없어요!');
+    // 자녀 선택 안 됨 → 자녀 선택 필요
+    if (!savedChildId) {
+        await loadChildrenList();
         return;
+    }
+    
+    // 정상: 데이터 로드
+    currentChildId = savedChildId;
+    loadChildData();
+    render();
+}
+
+// 자녀 데이터 로드
+async function loadChildData() {
+    if (!currentChildId) {
+        alert('자녀를 선택해주세요!');
+        return;
+    }
+    
+    try {
+        // Supabase 시도
+        if (supabaseClient) {
+            const { data: child, error } = await supabaseClient
+                .from('children')
+                .select('*')
+                .eq('id', currentChildId)
+                .single();
+            
+            if (!error && child) {
+                currentChild = child;
+                return;
+            }
+        }
+        
+        // 폴백: LocalStorage
+        const children = Storage.get('children') || [];
+        currentChild = children.find(c => c.id === currentChildId);
+        
+        if (!currentChild) {
+            alert('자녀 정보를 찾을 수 없어요!');
+        }
+        
+    } catch (error) {
+        console.error('자녀 데이터 로드 실패:', error);
+        
+        // 에러 시 LocalStorage 폴백
+        const children = Storage.get('children') || [];
+        currentChild = children.find(c => c.id === currentChildId);
     }
 }
 
