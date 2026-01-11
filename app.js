@@ -1,1481 +1,924 @@
-// 학원가자 PWA - 메인 JavaScript
+// 학원가자 - 부모 앱 JavaScript
 
-// ========================================
-// Supabase 초기화
-// ========================================
-
+// Supabase 설정
 const SUPABASE_URL = 'https://pvbfblbivboypjsnzmkj.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_7Kt6XwlLQG2xxlO9ABhG3Q_cyN-1i6_';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB2YmZibGJpdmJveXBqc256bWtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzYzMzk0NzMsImV4cCI6MjA1MTkxNTQ3M30.qI4iEEcVy3TxOQWx-EGg8P-LH6CtLSLFvGvT9vGJGfQ';
 
+// Supabase 클라이언트 초기화
 let supabaseClient;
 if (typeof window.supabase !== 'undefined') {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 }
 
-// 데이터 저장소 (LocalStorage - 임시 사용)
-const Storage = {
-    get(key) {
-        const data = localStorage.getItem(key);
-        return data ? JSON.parse(data) : null;
-    },
-    set(key, value) {
-        localStorage.setItem(key, JSON.stringify(value));
-    },
-    remove(key) {
-        localStorage.removeItem(key);
-    }
-};
+// 전역 변수
+let currentFamilyId = null;
+let currentChildId = null;
+let currentTab = 'home';
+let messageChannel = null;
 
-// 전역 상태
-let state = {
-    currentChildId: null,
-    children: [],
-    academies: [],
-    rewards: [],
-    subscription: {
-        status: 'trial', // trial, active, expired
-        trialStartDate: null,
-        planType: null // single, multi
-    },
-    familyId: null, // 가족 ID
-    familyCode: null // 가족 코드
-};
+// 앱 초기화
+window.addEventListener('DOMContentLoaded', () => {
+  registerServiceWorker();
+  setTimeout(() => {
+    initApp();
+  }, 1000);
+});
 
-// ========================================
-// 가족 코드 관리
-// ========================================
-
-// 6자리 랜덤 코드 생성
-function generateFamilyCode() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 문자 제외
-    let code = '';
-    for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-}
-
-// 가족 생성 또는 가져오기
-async function initializeFamily() {
+// Service Worker 등록
+async function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
     try {
-        // LocalStorage에서 familyId 확인
-        const savedFamilyId = Storage.get('familyId');
+      await navigator.serviceWorker.register('/service-worker.js');
+      console.log('[부모앱] Service Worker 등록 완료');
+    } catch (error) {
+      console.error('[부모앱] Service Worker 등록 실패:', error);
+    }
+  }
+}
+
+// 앱 초기화
+async function initApp() {
+  currentFamilyId = localStorage.getItem('familyId');
+  
+  document.getElementById('loadingScreen').style.display = 'none';
+  
+  if (!currentFamilyId) {
+    document.getElementById('setupCodeModal').style.display = 'flex';
+    return;
+  }
+  
+  document.getElementById('mainApp').style.display = 'block';
+  
+  await loadChildren();
+  
+  const savedChildId = localStorage.getItem('currentChildId');
+  if (savedChildId) {
+    currentChildId = savedChildId;
+    document.getElementById('childSelect').value = savedChildId;
+    await loadChildData();
+  }
+}
+
+// 가족 코드 생성
+async function createFamilyCode() {
+  const code = document.getElementById('familyCodeSetup').value.trim().toUpperCase();
+  
+  if (code.length !== 6) {
+    alert('6자리를 입력해주세요!');
+    return;
+  }
+  
+  if (!/^[A-Z0-9]+$/.test(code)) {
+    alert('영문과 숫자만 사용 가능해요!');
+    return;
+  }
+  
+  try {
+    console.log('🔄 가족 코드 생성 시도:', code);
+    
+    // Supabase 연결 확인
+    if (!supabaseClient) {
+      alert('❌ Supabase 연결 실패!\n\n페이지를 새로고침해주세요.');
+      return;
+    }
+    
+    const { data, error } = await supabaseClient
+      .from('families')
+      .insert([{ code: code }])
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Supabase 에러:', error);
+      
+      // 자세한 에러 메시지
+      if (error.code === '23505') {
+        alert('이미 사용 중인 코드예요. 다른 코드를 사용해주세요!');
+        return;
+      } else if (error.code === '42P01') {
+        alert('❌ 테이블이 없어요!\n\nSupabase에서 테이블을 먼저 생성해야 합니다.\n\n에러: ' + error.message);
+        return;
+      } else if (error.code === 'PGRST301' || error.message.includes('permission')) {
+        alert('❌ 권한 에러!\n\nSupabase에서 RLS 정책을 확인해주세요.\n\n에러: ' + error.message);
+        return;
+      } else if (error.message.includes('uuid')) {
+        alert('❌ UUID 에러!\n\nSupabase에서 uuid-ossp 확장을 활성화해야 합니다.\n\n에러: ' + error.message);
+        return;
+      }
+      
+      // 기타 에러
+      alert('❌ 에러 발생!\n\n' + error.message + '\n\n에러 코드: ' + (error.code || '없음'));
+      return;
+    }
+    
+    if (!data) {
+      alert('❌ 데이터가 반환되지 않았어요!\n\nSupabase 설정을 확인해주세요.');
+      return;
+    }
+    
+    console.log('✅ 코드 생성 성공:', data);
+    
+    localStorage.setItem('familyId', data.id);
+    localStorage.setItem('familyCode', data.code);
+    currentFamilyId = data.id;
+    
+    showFireworks();
+    
+    alert(`✅ 코드 생성 완료!\n\n자녀 앱에서 "${data.code}"를 입력하세요!`);
+    
+    document.getElementById('setupCodeModal').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    
+    await loadChildren();
+    
+  } catch (error) {
+    console.error('❌ 예외 발생:', error);
+    alert('❌ 예상치 못한 에러!\n\n' + error.message + '\n\nF12를 눌러 Console을 확인해주세요.');
+  }
+}
+
+// 자녀 목록 로드
+async function loadChildren() {
+  if (!currentFamilyId) return;
+  
+  try {
+    const { data, error } = await supabaseClient
+      .from('children')
+      .select('*')
+      .eq('family_id', currentFamilyId)
+      .order('created_at', { ascending: true });
+    
+    if (error) throw error;
+    
+    const select = document.getElementById('childSelect');
+    select.innerHTML = '<option value="">자녀를 선택하세요</option>';
+    
+    data.forEach(child => {
+      const option = document.createElement('option');
+      option.value = child.id;
+      option.textContent = child.name;
+      select.appendChild(option);
+    });
+    
+  } catch (error) {
+    console.error('자녀 목록 로드 실패:', error);
+  }
+}
+
+// 자녀 변경
+async function onChildChange() {
+  const select = document.getElementById('childSelect');
+  currentChildId = select.value;
+  
+  if (!currentChildId) return;
+  
+  localStorage.setItem('currentChildId', currentChildId);
+  
+  await loadChildData();
+}
+
+// 자녀 데이터 로드
+async function loadChildData() {
+  if (!currentChildId) return;
+  
+  // Realtime 구독
+  subscribeToMessages();
+  
+  // 각 탭 데이터 로드
+  await renderHomeTab();
+  await renderAcademiesTab();
+  await renderAttendanceTab();
+  await renderMessagesTab();
+  
+  // 메시지 배지 업데이트
+  updateMessageBadge();
+}
+
+// 홈 탭 렌더링
+async function renderHomeTab() {
+  if (!currentChildId) return;
+  
+  try {
+    const { data: child, error } = await supabaseClient
+      .from('children')
+      .select('*')
+      .eq('id', currentChildId)
+      .single();
+    
+    if (error) throw error;
+    
+    // 출석률 계산
+    const { data: academies } = await supabaseClient
+      .from('academies')
+      .select('id')
+      .eq('child_id', currentChildId);
+    
+    const academyIds = academies?.map(a => a.id) || [];
+    
+    let attendanceRate = 0;
+    if (academyIds.length > 0) {
+      const { count: totalDays } = await supabaseClient
+        .from('attendance')
+        .select('*', { count: 'exact', head: true })
+        .in('academy_id', academyIds);
+      
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      
+      // 예상 출석일수 계산 (간단히 30일로 가정)
+      const expectedDays = 30;
+      attendanceRate = expectedDays > 0 ? Math.round((totalDays / expectedDays) * 100) : 0;
+    }
+    
+    const statsHtml = `
+      <h3>${child.name}님의 통계</h3>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="stat-value">${child.total_points || 0}</span>
+          <span class="stat-label">총 포인트</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">${attendanceRate}%</span>
+          <span class="stat-label">출석률</span>
+        </div>
+      </div>
+    `;
+    
+    document.getElementById('childStats').innerHTML = statsHtml;
+    
+    // 오늘 일정
+    await renderTodaySchedule();
+    
+  } catch (error) {
+    console.error('홈 탭 렌더링 실패:', error);
+  }
+}
+
+// 오늘 일정 렌더링
+async function renderTodaySchedule() {
+  if (!currentChildId) return;
+  
+  try {
+    const { data: academies, error } = await supabaseClient
+      .from('academies')
+      .select('*')
+      .eq('child_id', currentChildId);
+    
+    if (error) throw error;
+    
+    const today = new Date().getDay();
+    const todayAcademies = academies?.filter(academy => {
+      const schedule = academy.schedule || [];
+      return schedule.some(s => s.day === today && s.enabled);
+    }) || [];
+    
+    let scheduleHtml = '<h3>📅 오늘 일정</h3>';
+    
+    if (todayAcademies.length === 0) {
+      scheduleHtml += '<div class="empty-state"><div class="empty-state-icon">📅</div><p>오늘은 학원이 없어요!</p></div>';
+    } else {
+      todayAcademies.forEach(academy => {
+        const todaySchedule = academy.schedule.find(s => s.day === today);
+        scheduleHtml += `
+          <div class="schedule-item">
+            <strong>${academy.name}</strong><br>
+            출발: ${academy.departure_time} → 수업: ${todaySchedule.time}
+          </div>
+        `;
+      });
+    }
+    
+    document.getElementById('todaySchedule').innerHTML = scheduleHtml;
+    
+  } catch (error) {
+    console.error('오늘 일정 렌더링 실패:', error);
+  }
+}
+
+// 학원 탭 렌더링
+async function renderAcademiesTab() {
+  if (!currentChildId) return;
+  
+  try {
+    const { data: academies, error } = await supabaseClient
+      .from('academies')
+      .select('*')
+      .eq('child_id', currentChildId)
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    const container = document.getElementById('academyList');
+    
+    if (!academies || academies.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📚</div><p>등록된 학원이 없어요.<br>학원을 추가해주세요!</p></div>';
+      return;
+    }
+    
+    const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    
+    container.innerHTML = academies.map(academy => {
+      const schedule = academy.schedule || [];
+      const scheduleDays = schedule
+        .filter(s => s.enabled)
+        .map(s => `<span class="schedule-day active">${dayNames[s.day]} ${s.time}</span>`)
+        .join('');
+      
+      return `
+        <div class="academy-card">
+          <div class="academy-header">
+            <div class="academy-name">${academy.name}</div>
+            <div class="academy-actions">
+              <button onclick="editAcademy('${academy.id}')">✏️</button>
+              <button onclick="deleteAcademy('${academy.id}')">🗑️</button>
+            </div>
+          </div>
+          <div class="academy-info">
+            <div>📍 ${academy.address || '주소 미등록'}</div>
+            <div>🚀 출발: ${academy.departure_time}</div>
+            <div>💰 ${academy.fee ? academy.fee.toLocaleString() + '원' : '수강료 미등록'} / ${academy.payment_day || '-'}일 결제</div>
+          </div>
+          <div class="academy-schedule">
+            ${scheduleDays || '<span class="schedule-day">일정 없음</span>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+  } catch (error) {
+    console.error('학원 탭 렌더링 실패:', error);
+  }
+}
+
+// 출석 탭 렌더링
+async function renderAttendanceTab() {
+  document.getElementById('attendanceCalendar').innerHTML = '<p>출석 달력 준비 중...</p>';
+  document.getElementById('attendanceStats').innerHTML = '<p>통계 준비 중...</p>';
+}
+
+// 메시지 탭 렌더링
+async function renderMessagesTab() {
+  if (!currentChildId) return;
+  
+  try {
+    const { data: messages, error } = await supabaseClient
+      .from('messages')
+      .select('*')
+      .eq('child_id', currentChildId)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (error) throw error;
+    
+    const container = document.getElementById('messageList');
+    
+    if (!messages || messages.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">💬</div><p>메시지가 없어요!</p></div>';
+      return;
+    }
+    
+    container.innerHTML = messages.map(msg => {
+      const time = new Date(msg.created_at).toLocaleString('ko-KR');
+      return `
+        <div class="message-item ${msg.read ? '' : 'unread'}">
+          <div class="message-header">
+            <span class="message-emoji">${msg.emoji || '💬'}</span>
+            <span class="message-time">${time}</span>
+          </div>
+          <div class="message-content">${msg.content}</div>
+        </div>
+      `;
+    }).join('');
+    
+    // 읽음 처리
+    await supabaseClient
+      .from('messages')
+      .update({ read: true })
+      .eq('child_id', currentChildId)
+      .eq('read', false);
+    
+    updateMessageBadge();
+    
+  } catch (error) {
+    console.error('메시지 탭 렌더링 실패:', error);
+  }
+}
+
+// 메시지 배지 업데이트
+async function updateMessageBadge() {
+  if (!currentChildId) return;
+  
+  try {
+    const { count, error } = await supabaseClient
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('child_id', currentChildId)
+      .eq('read', false);
+    
+    if (error) throw error;
+    
+    const badge = document.getElementById('messageBadge');
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+    
+  } catch (error) {
+    console.error('메시지 배지 업데이트 실패:', error);
+  }
+}
+
+// Realtime 메시지 구독
+function subscribeToMessages() {
+  if (messageChannel) {
+    supabaseClient.removeChannel(messageChannel);
+  }
+  
+  messageChannel = supabaseClient
+    .channel('child-messages')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'messages',
+        filter: `child_id=eq.${currentChildId}`
+      },
+      (payload) => {
+        console.log('새 메시지:', payload.new);
         
-        if (savedFamilyId) {
-            // 기존 가족 가져오기
-            const { data, error } = await supabaseClient
-                .from('families')
-                .select('*')
-                .eq('id', savedFamilyId)
-                .single();
-            
-            if (data) {
-                state.familyId = data.id;
-                state.familyCode = data.code;
-                console.log('가족 코드:', data.code);
-                return;
-            }
+        if (payload.new.type === 'arrival') {
+          showFireworks();
         }
         
-        // 새 가족 생성
-        const code = generateFamilyCode();
-        const { data, error } = await supabaseClient
-            .from('families')
-            .insert([{ code: code }])
-            .select()
-            .single();
-        
-        if (error) throw error;
-        
-        state.familyId = data.id;
-        state.familyCode = data.code;
-        Storage.set('familyId', data.id);
-        
-        console.log('✅ 가족 생성 완료! 코드:', data.code);
-        
-        // 코드 표시
-        alert(`🎉 가족 코드가 생성되었어요!\n\n코드: ${data.code}\n\n자녀 앱에서 이 코드를 입력하세요!`);
-        
-    } catch (error) {
-        console.error('가족 초기화 실패:', error);
+        if (currentTab !== 'messages') {
+          updateMessageBadge();
+          showNewMessageNotification(payload.new);
+        } else {
+          renderMessagesTab();
+        }
+      }
+    )
+    .subscribe();
+}
+
+// 새 메시지 알림
+function showNewMessageNotification(message) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    new Notification('학원가자', {
+      body: message.content,
+      icon: 'icon-parent-192.png'
+    });
+  }
+}
+
+// 탭 전환
+function switchToTab(tab) {
+  currentTab = tab;
+  
+  // 모든 탭 숨기기
+  document.querySelectorAll('.tab-pane').forEach(pane => {
+    pane.classList.remove('active');
+  });
+  
+  // 모든 네비게이션 비활성화
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.remove('active');
+  });
+  
+  // 선택된 탭 표시
+  document.getElementById(tab + 'Tab').classList.add('active');
+  document.querySelectorAll('.nav-item')[
+    ['home', 'academies', 'attendance', 'messages', 'settings'].indexOf(tab)
+  ].classList.add('active');
+}
+
+// 자녀 추가 모달
+function showAddChildModal() {
+  document.getElementById('addChildModal').style.display = 'flex';
+  document.getElementById('childName').value = '';
+}
+
+// 자녀 추가
+async function addChild() {
+  const name = document.getElementById('childName').value.trim();
+  
+  if (!name) {
+    alert('이름을 입력해주세요!');
+    return;
+  }
+  
+  try {
+    const { data, error } = await supabaseClient
+      .from('children')
+      .insert([{
+        family_id: currentFamilyId,
+        name: name,
+        total_points: 0
+      }])
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    alert('✅ 자녀가 추가되었어요!');
+    closeModal('addChildModal');
+    await loadChildren();
+    
+  } catch (error) {
+    console.error('자녀 추가 실패:', error);
+    alert('자녀 추가에 실패했어요!');
+  }
+}
+
+// 학원 추가 모달
+function showAddAcademyModal() {
+  if (!currentChildId) {
+    alert('먼저 자녀를 선택해주세요!');
+    return;
+  }
+  
+  document.getElementById('academyModalTitle').textContent = '📚 학원 추가';
+  document.getElementById('editAcademyId').value = '';
+  document.getElementById('academyName').value = '';
+  document.getElementById('academyAddress').value = '';
+  document.getElementById('academyDepartureTime').value = '';
+  document.getElementById('academyFee').value = '';
+  document.getElementById('academyPaymentDay').value = '';
+  document.getElementById('academyLat').value = '';
+  document.getElementById('academyLon').value = '';
+  
+  // 요일별 일정 입력 생성
+  const dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+  const scheduleHtml = dayNames.map((day, index) => `
+    <div class="schedule-input-row">
+      <input type="checkbox" id="day${index}" class="schedule-checkbox">
+      <label for="day${index}">${day}</label>
+      <input type="time" id="time${index}" placeholder="시간">
+    </div>
+  `).join('');
+  
+  document.getElementById('scheduleInputs').innerHTML = scheduleHtml;
+  document.getElementById('academyModal').style.display = 'flex';
+}
+
+// 학원 수정
+async function editAcademy(academyId) {
+  try {
+    const { data: academy, error } = await supabaseClient
+      .from('academies')
+      .select('*')
+      .eq('id', academyId)
+      .single();
+    
+    if (error) throw error;
+    
+    document.getElementById('academyModalTitle').textContent = '✏️ 학원 수정';
+    document.getElementById('editAcademyId').value = academyId;
+    document.getElementById('academyName').value = academy.name;
+    document.getElementById('academyAddress').value = academy.address || '';
+    document.getElementById('academyDepartureTime').value = academy.departure_time;
+    document.getElementById('academyFee').value = academy.fee || '';
+    document.getElementById('academyPaymentDay').value = academy.payment_day || '';
+    
+    if (academy.location_gate) {
+      document.getElementById('academyLat').value = academy.location_gate.lat;
+      document.getElementById('academyLon').value = academy.location_gate.lon;
     }
+    
+    // 요일별 일정 입력 생성
+    const dayNames = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+    const scheduleHtml = dayNames.map((day, index) => {
+      const daySchedule = academy.schedule?.find(s => s.day === index);
+      return `
+        <div class="schedule-input-row">
+          <input type="checkbox" id="day${index}" class="schedule-checkbox" ${daySchedule?.enabled ? 'checked' : ''}>
+          <label for="day${index}">${day}</label>
+          <input type="time" id="time${index}" value="${daySchedule?.time || ''}">
+        </div>
+      `;
+    }).join('');
+    
+    document.getElementById('scheduleInputs').innerHTML = scheduleHtml;
+    document.getElementById('academyModal').style.display = 'flex';
+    
+  } catch (error) {
+    console.error('학원 정보 로드 실패:', error);
+    alert('학원 정보를 불러올 수 없어요!');
+  }
+}
+
+// 학원 저장
+async function saveAcademy() {
+  const name = document.getElementById('academyName').value.trim();
+  const address = document.getElementById('academyAddress').value.trim();
+  const departureTime = document.getElementById('academyDepartureTime').value;
+  const fee = document.getElementById('academyFee').value;
+  const paymentDay = document.getElementById('academyPaymentDay').value;
+  const lat = document.getElementById('academyLat').value;
+  const lon = document.getElementById('academyLon').value;
+  
+  if (!name) {
+    alert('학원 이름을 입력해주세요!');
+    return;
+  }
+  
+  if (!departureTime) {
+    alert('출발 시간을 입력해주세요!');
+    return;
+  }
+  
+  // 일정 수집
+  const schedule = [];
+  for (let i = 0; i < 7; i++) {
+    const enabled = document.getElementById(`day${i}`).checked;
+    const time = document.getElementById(`time${i}`).value;
+    schedule.push({
+      day: i,
+      enabled: enabled && time !== '',
+      time: time || null
+    });
+  }
+  
+  const academyData = {
+    child_id: currentChildId,
+    name: name,
+    address: address,
+    departure_time: departureTime,
+    fee: fee ? parseInt(fee) : null,
+    payment_day: paymentDay ? parseInt(paymentDay) : null,
+    schedule: schedule,
+    location_gate: lat && lon ? { lat: parseFloat(lat), lon: parseFloat(lon) } : null
+  };
+  
+  try {
+    const academyId = document.getElementById('editAcademyId').value;
+    
+    if (academyId) {
+      // 수정
+      const { error } = await supabaseClient
+        .from('academies')
+        .update(academyData)
+        .eq('id', academyId);
+      
+      if (error) throw error;
+      alert('✅ 학원이 수정되었어요!');
+    } else {
+      // 추가
+      const { error } = await supabaseClient
+        .from('academies')
+        .insert([academyData]);
+      
+      if (error) throw error;
+      alert('✅ 학원이 추가되었어요!');
+    }
+    
+    closeModal('academyModal');
+    await renderAcademiesTab();
+    await renderHomeTab();
+    
+  } catch (error) {
+    console.error('학원 저장 실패:', error);
+    alert('학원 저장에 실패했어요!');
+  }
+}
+
+// 학원 삭제
+async function deleteAcademy(academyId) {
+  if (!confirm('정말 삭제하시겠어요?')) return;
+  
+  try {
+    const { error } = await supabaseClient
+      .from('academies')
+      .delete()
+      .eq('id', academyId);
+    
+    if (error) throw error;
+    
+    alert('✅ 학원이 삭제되었어요!');
+    await renderAcademiesTab();
+    await renderHomeTab();
+    
+  } catch (error) {
+    console.error('학원 삭제 실패:', error);
+    alert('학원 삭제에 실패했어요!');
+  }
+}
+
+// 현재 위치 가져오기
+function getCurrentLocation() {
+  if (!navigator.geolocation) {
+    alert('GPS를 지원하지 않는 기기예요!');
+    return;
+  }
+  
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      document.getElementById('academyLat').value = position.coords.latitude;
+      document.getElementById('academyLon').value = position.coords.longitude;
+      alert('✅ 현재 위치가 입력되었어요!');
+    },
+    (error) => {
+      console.error('위치 가져오기 실패:', error);
+      alert('위치를 가져올 수 없어요!');
+    }
+  );
+}
+
+// 보상 관리
+function showRewardsManagement() {
+  if (!currentChildId) {
+    alert('먼저 자녀를 선택해주세요!');
+    return;
+  }
+  
+  loadRewards();
+  document.getElementById('rewardsModal').style.display = 'flex';
+}
+
+async function loadRewards() {
+  try {
+    const { data: rewards, error } = await supabaseClient
+      .from('rewards')
+      .select('*')
+      .eq('child_id', currentChildId)
+      .order('points_required', { ascending: true });
+    
+    if (error) throw error;
+    
+    const container = document.getElementById('rewardsList');
+    
+    if (!rewards || rewards.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>등록된 보상이 없어요!</p></div>';
+      return;
+    }
+    
+    container.innerHTML = rewards.map(reward => `
+      <div class="reward-item">
+        <div class="reward-info">
+          <div class="reward-name">${reward.name}</div>
+          <div class="reward-points">${reward.points_required}P 필요</div>
+          ${reward.claimed ? '<div style="color: green;">✅ 받음</div>' : ''}
+        </div>
+        <button class="btn-delete" onclick="deleteReward('${reward.id}')">삭제</button>
+      </div>
+    `).join('');
+    
+  } catch (error) {
+    console.error('보상 로드 실패:', error);
+  }
+}
+
+async function addReward() {
+  const name = document.getElementById('rewardName').value.trim();
+  const points = document.getElementById('rewardPoints').value;
+  
+  if (!name || !points) {
+    alert('보상 이름과 포인트를 입력해주세요!');
+    return;
+  }
+  
+  try {
+    const { error } = await supabaseClient
+      .from('rewards')
+      .insert([{
+        child_id: currentChildId,
+        name: name,
+        points_required: parseInt(points),
+        claimed: false
+      }]);
+    
+    if (error) throw error;
+    
+    document.getElementById('rewardName').value = '';
+    document.getElementById('rewardPoints').value = '';
+    
+    await loadRewards();
+    
+  } catch (error) {
+    console.error('보상 추가 실패:', error);
+    alert('보상 추가에 실패했어요!');
+  }
+}
+
+async function deleteReward(rewardId) {
+  if (!confirm('정말 삭제하시겠어요?')) return;
+  
+  try {
+    const { error } = await supabaseClient
+      .from('rewards')
+      .delete()
+      .eq('id', rewardId);
+    
+    if (error) throw error;
+    
+    await loadRewards();
+    
+  } catch (error) {
+    console.error('보상 삭제 실패:', error);
+    alert('보상 삭제에 실패했어요!');
+  }
+}
+
+// 자녀 관리
+function showChildManagement() {
+  loadChildrenList();
+  document.getElementById('childManagementModal').style.display = 'flex';
+}
+
+async function loadChildrenList() {
+  try {
+    const { data: children, error } = await supabaseClient
+      .from('children')
+      .select('*')
+      .eq('family_id', currentFamilyId);
+    
+    if (error) throw error;
+    
+    const container = document.getElementById('childrenList');
+    
+    if (!children || children.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>등록된 자녀가 없어요!</p></div>';
+      return;
+    }
+    
+    container.innerHTML = children.map(child => `
+      <div class="child-item">
+        <div class="child-info">
+          <div class="child-name">${child.name}</div>
+          <div style="font-size: 14px; color: #666;">${child.total_points || 0}P</div>
+        </div>
+        <button class="btn-delete" onclick="deleteChild('${child.id}')">삭제</button>
+      </div>
+    `).join('');
+    
+  } catch (error) {
+    console.error('자녀 목록 로드 실패:', error);
+  }
+}
+
+async function deleteChild(childId) {
+  if (!confirm('정말 삭제하시겠어요? 모든 학원과 출석 기록이 함께 삭제됩니다!')) return;
+  
+  try {
+    const { error } = await supabaseClient
+      .from('children')
+      .delete()
+      .eq('id', childId);
+    
+    if (error) throw error;
+    
+    if (currentChildId === childId) {
+      currentChildId = null;
+      localStorage.removeItem('currentChildId');
+    }
+    
+    await loadChildren();
+    await loadChildrenList();
+    
+  } catch (error) {
+    console.error('자녀 삭제 실패:', error);
+    alert('자녀 삭제에 실패했어요!');
+  }
 }
 
 // 가족 코드 보기
 function showFamilyCode() {
-    if (state.familyCode) {
-        alert(`👨‍👩‍👧 가족 코드\n\n${state.familyCode}\n\n자녀 앱에서 이 코드를 입력하면 연결됩니다!`);
-    } else {
-        alert('가족 코드를 생성 중입니다...');
-    }
+  const code = localStorage.getItem('familyCode');
+  alert(`🔑 가족 코드\n\n${code}\n\n자녀 앱에서 이 코드를 입력하세요!`);
 }
 
-// 초기화
-async function init() {
-    // 가족 초기화 (Supabase)
-    await initializeFamily();
-    
-    loadData();
-    checkPaymentAlerts();
-    render();
-    
-    // 로딩 화면 숨기기
+// 앱 정보
+function showAppInfo() {
+  alert('학원가자 v1.0\n\n초등학생 자녀의 학원 출석을 돕는 앱입니다.\n\n© 2025 Ondolcare');
+}
+
+// 모달 닫기
+function closeModal(modalId) {
+  document.getElementById(modalId).style.display = 'none';
+}
+
+// 폭죽 애니메이션
+function showFireworks() {
+  const colors = ['#FFD700', '#FF69B4', '#87CEEB', '#98D8C8'];
+  
+  for (let i = 0; i < 30; i++) {
     setTimeout(() => {
-        document.getElementById('loadingScreen').style.display = 'none';
-    }, 1000);
-    
-    // 매일 결제일 체크
-    setInterval(checkPaymentAlerts, 1000 * 60 * 60); // 1시간마다
-    
-    // 알림 스케줄링
-    scheduleNotifications();
-    
-    // 알림 권한 요청 (첫 실행 시)
-    if ('Notification' in window && Notification.permission === 'default') {
-        setTimeout(() => {
-            if (confirm('학원 출발 시간 알림을 받으시겠어요?')) {
-                requestNotificationPermission();
-            }
-        }, 3000);
-    }
-}
-
-// 데이터 로드
-function loadData() {
-    // 저장된 데이터 로드
-    state.children = Storage.get('children') || [];
-    state.academies = Storage.get('academies') || [];
-    state.rewards = Storage.get('rewards') || [];
-    state.subscription = Storage.get('subscription') || {
-        status: 'trial',
-        trialStartDate: new Date().toISOString(),
-        planType: null
-    };
-    
-    // 현재 자녀 설정
-    state.currentChildId = Storage.get('currentChildId');
-    if (!state.currentChildId && state.children.length > 0) {
-        state.currentChildId = state.children[0].id;
-        Storage.set('currentChildId', state.currentChildId);
-    }
-    
-    // 데이터 마이그레이션 또는 초기 데이터
-    if (state.children.length === 0) {
-        // 데모 데이터 추가 (옵션)
-        addDemoData();
-    }
-}
-
-// 데모 데이터 추가
-function addDemoData() {
-    const demoChild = {
-        id: generateId(),
-        name: '민수',
-        totalPoints: 45,
-        createdAt: new Date().toISOString()
-    };
-    
-    state.children.push(demoChild);
-    state.currentChildId = demoChild.id;
-    
-    const demoAcademy = {
-        id: generateId(),
-        childId: demoChild.id,
-        name: '태권도 학원',
-        address: '서울시 강남구',
-        fee: 150000,
-        paymentDay: 25,
-        locationGate: null,
-        locationBus: null,
-        schedule: [
-            { day: 1, time: '16:00', enabled: true },
-            { day: 3, time: '16:00', enabled: true },
-            { day: 5, time: '16:00', enabled: true }
-        ],
-        departureTime: '15:30',
-        weatherAlerts: {
-            rain: true,
-            fineDust: true
-        }
-    };
-    
-    state.academies.push(demoAcademy);
-    
-    const demoRewards = [
-        {
-            id: generateId(),
-            childId: demoChild.id,
-            name: '아이스크림 🍦',
-            pointsRequired: 20,
-            claimed: false
-        },
-        {
-            id: generateId(),
-            childId: demoChild.id,
-            name: '게임 30분 🎮',
-            pointsRequired: 30,
-            claimed: false
-        }
-    ];
-    
-    state.rewards.push(...demoRewards);
-    
-    saveData();
-}
-
-// 데이터 저장
-function saveData() {
-    Storage.set('children', state.children);
-    Storage.set('academies', state.academies);
-    Storage.set('rewards', state.rewards);
-    Storage.set('subscription', state.subscription);
-    Storage.set('currentChildId', state.currentChildId);
-}
-
-// ID 생성
-function generateId() {
-    return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-}
-
-// 시간을 분으로 변환 (유효성 검사용)
-function convertTimeToMinutes(timeString) {
-    const [hours, minutes] = timeString.split(':').map(Number);
-    return hours * 60 + minutes;
-}
-
-// 렌더링
-function render() {
-    renderChildSelector();
-    renderTrialBanner();
-    renderAcademies();
-    renderBudget();
-    renderRewards();
-    renderSettings();
-    checkChildMessages(); // 메시지 체크
-}
-
-// 자녀 선택기 렌더
-function renderChildSelector() {
-    const selector = document.getElementById('childSelector');
-    const currentChild = getCurrentChild();
-    
-    selector.innerHTML = state.children.map(child => `
-        <option value="${child.id}" ${child.id === state.currentChildId ? 'selected' : ''}>
-            ${child.name}
-        </option>
-    `).join('');
-    
-    // 포인트 표시
-    if (currentChild) {
-        document.getElementById('currentPoints').textContent = currentChild.totalPoints;
-        document.getElementById('currentChildName').textContent = currentChild.name;
-        document.getElementById('rewardPoints').textContent = currentChild.totalPoints;
-    }
-}
-
-// 무료 체험 배너
-function renderTrialBanner() {
-    if (state.subscription.status === 'trial') {
-        const banner = document.getElementById('trialBanner');
-        const daysLeft = getTrialDaysLeft();
-        
-        banner.style.display = 'block';
-        document.getElementById('trialDays').textContent = daysLeft;
-    }
-}
-
-// 체험 기간 계산
-function getTrialDaysLeft() {
-    if (!state.subscription.trialStartDate) return 14;
-    
-    const startDate = new Date(state.subscription.trialStartDate);
-    const now = new Date();
-    const diffTime = 14 * 24 * 60 * 60 * 1000 - (now - startDate);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return Math.max(0, diffDays);
-}
-
-// 현재 자녀 가져오기
-function getCurrentChild() {
-    return state.children.find(c => c.id === state.currentChildId);
-}
-
-// 자녀 전환
-function switchChild() {
-    const selector = document.getElementById('childSelector');
-    state.currentChildId = selector.value;
-    saveData();
-    render();
-}
-
-// 탭 전환
-function showTab(tabName) {
-    // 탭 버튼 활성화
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-    });
-    event.target.closest('.tab-btn').classList.add('active');
-    
-    // 탭 컨텐츠 표시
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.remove('active');
-    });
-    document.getElementById(tabName + 'Tab').classList.add('active');
-    
-    // 탭별 렌더링
-    if (tabName === 'budget') {
-        renderBudget();
-    }
-}
-
-// 학원 목록 렌더
-function renderAcademies() {
-    const container = document.getElementById('academiesList');
-    const childAcademies = state.academies.filter(a => a.childId === state.currentChildId);
-    
-    if (childAcademies.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-emoji">🏫</div>
-                <h3>등록된 학원이 없어요</h3>
-                <p>학원을 추가하고<br>똑똑한 출석 관리를 시작하세요!</p>
-            </div>
-        `;
-        return;
-    }
-    
-    container.innerHTML = childAcademies.map(academy => {
-        const dayLabels = academy.schedule
-            .filter(s => s.enabled)
-            .map(s => ['일', '월', '화', '수', '목', '금', '토'][s.day])
-            .join(', ');
-        
-        return `
-            <div class="academy-card">
-                <div class="academy-header">
-                    <h3 class="academy-name">${academy.name}</h3>
-                    <button class="btn-icon" onclick="editAcademy('${academy.id}')">✏️</button>
-                </div>
-                <p class="academy-address">📍 ${academy.address}</p>
-                <div class="academy-info">
-                    <div class="info-row">
-                        <span class="info-label">수업 요일:</span>
-                        <span class="info-value">${dayLabels}</span>
-                    </div>
-                    <div class="info-row">
-                        <span class="info-label">출발 시간:</span>
-                        <span class="info-value">${academy.departureTime}</span>
-                    </div>
-                    ${academy.fee ? `
-                        <div class="info-row">
-                            <span class="info-label">월 학원비:</span>
-                            <span class="info-value">${academy.fee.toLocaleString()}원</span>
-                        </div>
-                    ` : ''}
-                </div>
-                ${academy.weatherAlerts && (academy.weatherAlerts.rain || academy.weatherAlerts.fineDust) ? `
-                    <div class="badge-row">
-                        ${academy.weatherAlerts.rain ? '<span class="badge">☔ 비 알림</span>' : ''}
-                        ${academy.weatherAlerts.fineDust ? '<span class="badge">😷 미세먼지</span>' : ''}
-                    </div>
-                ` : ''}
-                <div class="academy-actions">
-                    <button class="btn-action" onclick="setAcademyLocation('${academy.id}', 'gate')" title="학원 정문 위치 설정">
-                        📍 ${academy.locationGate ? '위치 ✓' : '위치설정'}
-                    </button>
-                    <button class="btn-action" onclick="${academy.voiceMessage ? 'playVoiceMessage' : 'showVoiceRecorder'}('${academy.id}')" title="엄마 목소리">
-                        🎤 ${academy.voiceMessage ? '듣기' : '녹음'}
-                    </button>
-                    <button class="btn-action btn-primary" onclick="checkAttendance('${academy.id}')" title="출석 체크">
-                        ✅ 출석체크
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-// 가계부 렌더 (NEW!)
-function renderBudget() {
-    const childAcademies = state.academies.filter(a => a.childId === state.currentChildId);
-    const academiesWithFee = childAcademies.filter(a => a.fee);
-    
-    // 총액 계산
-    const totalBudget = academiesWithFee.reduce((sum, a) => sum + a.fee, 0);
-    
-    document.getElementById('totalBudget').textContent = totalBudget.toLocaleString() + '원';
-    document.getElementById('academyCount').textContent = academiesWithFee.length + '개 학원';
-    
-    // 결제 일정
-    const paymentList = document.getElementById('paymentList');
-    
-    if (academiesWithFee.length === 0) {
-        paymentList.innerHTML = '<div class="empty-state-small">결제 예정인 학원비가 없어요</div>';
-        return;
-    }
-    
-    // 결제일 계산
-    const today = new Date();
-    const payments = academiesWithFee.map(academy => {
-        const paymentDate = new Date(today.getFullYear(), today.getMonth(), academy.paymentDay);
-        if (paymentDate < today) {
-            paymentDate.setMonth(paymentDate.getMonth() + 1);
-        }
-        
-        const daysLeft = Math.ceil((paymentDate - today) / (1000 * 60 * 60 * 24));
-        
-        return {
-            academy,
-            paymentDate,
-            daysLeft
-        };
-    }).sort((a, b) => a.daysLeft - b.daysLeft);
-    
-    paymentList.innerHTML = payments.map(p => `
-        <div class="payment-item ${p.daysLeft <= 5 ? 'urgent' : ''}">
-            <div class="payment-info">
-                <h4>${p.academy.name}</h4>
-                <p>${p.paymentDate.getMonth() + 1}월 ${p.paymentDate.getDate()}일 (D-${p.daysLeft})</p>
-            </div>
-            <div class="payment-amount">${p.academy.fee.toLocaleString()}원</div>
-        </div>
-    `).join('');
-    
-    // 월별 통계 (간단 버전)
-    document.getElementById('thisMonth').textContent = totalBudget.toLocaleString() + '원';
-    document.getElementById('lastMonth').textContent = totalBudget.toLocaleString() + '원';
-}
-
-// 결제일 알림 체크 (NEW!)
-function checkPaymentAlerts() {
-    const notifEnabled = document.getElementById('paymentNotif')?.checked !== false;
-    if (!notifEnabled) return;
-    
-    const childAcademies = state.academies.filter(a => a.childId === state.currentChildId);
-    const today = new Date();
-    const alerts = [];
-    
-    childAcademies.forEach(academy => {
-        if (!academy.fee || !academy.paymentDay) return;
-        
-        const paymentDate = new Date(today.getFullYear(), today.getMonth(), academy.paymentDay);
-        if (paymentDate < today) {
-            paymentDate.setMonth(paymentDate.getMonth() + 1);
-        }
-        
-        const daysLeft = Math.ceil((paymentDate - today) / (1000 * 60 * 60 * 24));
-        
-        if (daysLeft === 5) {
-            alerts.push({
-                academy,
-                paymentDate,
-                daysLeft
-            });
-        }
-    });
-    
-    if (alerts.length > 0) {
-        showPaymentAlert(alerts);
-    }
-}
-
-// 결제일 알림 모달 표시
-function showPaymentAlert(alerts) {
-    const modal = document.getElementById('paymentAlertModal');
-    const content = document.getElementById('paymentAlertContent');
-    
-    content.innerHTML = alerts.map(alert => `
-        <div class="payment-alert-item">
-            <h3>${alert.academy.name}</h3>
-            <p>${alert.paymentDate.getMonth() + 1}월 ${alert.paymentDate.getDate()}일</p>
-            <div class="payment-alert-amount">${alert.academy.fee.toLocaleString()}원</div>
-            <p style="margin-top: 8px; font-weight: 600;">결제일이 5일 남았어요!</p>
-        </div>
-    `).join('');
-    
-    modal.style.display = 'flex';
-}
-
-// 결제일 알림 닫기
-function closePaymentAlert() {
-    document.getElementById('paymentAlertModal').style.display = 'none';
-}
-
-// 보상 렌더
-function renderRewards() {
-    const childRewards = state.rewards.filter(r => r.childId === state.currentChildId);
-    const currentChild = getCurrentChild();
-    const availablePoints = currentChild ? currentChild.totalPoints : 0;
-    
-    // 받을 수 있는 보상
-    const availableRewards = childRewards.filter(r => !r.claimed);
-    const rewardsList = document.getElementById('rewardsList');
-    
-    if (availableRewards.length === 0) {
-        rewardsList.innerHTML = '<div class="empty-state-small">등록된 보상이 없어요</div>';
-    } else {
-        rewardsList.innerHTML = availableRewards.map(reward => {
-            const canClaim = availablePoints >= reward.pointsRequired;
-            
-            return `
-                <div class="reward-card ${!canClaim ? 'disabled' : ''}">
-                    <div class="reward-info">
-                        <h4>${reward.name}</h4>
-                        <div>
-                            <span class="reward-points">${reward.pointsRequired}P</span>
-                            ${canClaim ? '<span class="can-claim-badge">받을 수 있어요!</span>' : ''}
-                        </div>
-                    </div>
-                    <button class="claim-btn" ${!canClaim ? 'disabled' : ''} onclick="claimReward('${reward.id}')">
-                        ${canClaim ? '받기' : '잠금'}
-                    </button>
-                </div>
-            `;
-        }).join('');
-    }
-    
-    // 받은 보상
-    const claimedRewards = childRewards.filter(r => r.claimed);
-    const claimedList = document.getElementById('claimedRewardsList');
-    
-    if (claimedRewards.length === 0) {
-        claimedList.innerHTML = '<div class="empty-state-small">받은 보상이 없어요</div>';
-    } else {
-        claimedList.innerHTML = claimedRewards.map(reward => `
-            <div class="reward-card" style="background: #F5F5F5;">
-                <div class="reward-info">
-                    <h4 style="color: ${getComputedStyle(document.documentElement).getPropertyValue('--text-secondary')}">${reward.name}</h4>
-                    <div class="reward-points" style="color: ${getComputedStyle(document.documentElement).getPropertyValue('--text-light')}">${reward.pointsRequired}P</div>
-                </div>
-                <span style="font-size: 24px; color: ${getComputedStyle(document.documentElement).getPropertyValue('--success')}">✓</span>
-            </div>
-        `).join('');
-    }
-}
-
-// 보상 받기
-function claimReward(rewardId) {
-    const reward = state.rewards.find(r => r.id === rewardId);
-    const currentChild = getCurrentChild();
-    
-    if (!reward || !currentChild) return;
-    
-    if (currentChild.totalPoints < reward.pointsRequired) {
-        const needed = reward.pointsRequired - currentChild.totalPoints;
-        alert(`${needed}P가 더 필요해요!\n열심히 학원에 가서 포인트를 모아보세요! 💪`);
-        return;
-    }
-    
-    if (confirm(`"${reward.name}" 보상을 받으시겠어요?\n${reward.pointsRequired}P가 차감됩니다.`)) {
-        reward.claimed = true;
-        reward.claimedAt = new Date().toISOString();
-        currentChild.totalPoints -= reward.pointsRequired;
-        
-        saveData();
-        render();
-        
-        // 폭죽 효과 (간단 버전)
-        alert('축하해요! 🎉\n보상을 받았어요!');
-    }
-}
-
-// 설정 렌더
-function renderSettings() {
-    const daysLeft = getTrialDaysLeft();
-    document.getElementById('settingsTrialDays').textContent = daysLeft;
-}
-
-// 로그아웃
-function logout() {
-    if (confirm('로그아웃 하시겠어요?')) {
-        // 실제로는 인증 로직 필요
-        alert('로그아웃 되었습니다.');
-    }
-}
-
-// 모달 함수들
-async function showAddChildModal() {
-    const name = prompt('자녀 이름을 입력하세요:');
-    if (!name) return;
-    
-    const child = {
-        id: generateId(),
-        name: name.trim(),
-        totalPoints: 0,
-        createdAt: new Date().toISOString()
-    };
-    
-    // Supabase에 저장
-    if (supabaseClient && state.familyId) {
-        try {
-            const { data, error } = await supabaseClient
-                .from('children')
-                .insert([{
-                    id: child.id,
-                    family_id: state.familyId,
-                    name: child.name,
-                    total_points: child.totalPoints
-                }])
-                .select()
-                .single();
-            
-            if (error) {
-                console.error('Supabase 저장 실패:', error);
-                alert('⚠️ 온라인 저장에 실패했어요.\nLocalStorage에만 저장됩니다.');
-            } else {
-                console.log('✅ Supabase 저장 성공:', data);
-            }
-        } catch (error) {
-            console.error('Supabase 에러:', error);
-        }
-    }
-    
-    // LocalStorage에도 저장 (폴백)
-    state.children.push(child);
-    state.currentChildId = child.id;
-    saveData();
-    render();
-}
-
-// 학원 추가 모달 열기
-function showAddAcademyModal() {
-    if (!state.currentChildId) {
-        alert('먼저 자녀를 추가해주세요!');
-        return;
-    }
-    
-    // 폼 리셋
-    document.getElementById('academyForm').reset();
-    document.getElementById('editingAcademyId').value = '';
-    document.getElementById('academyModalTitle').textContent = '🏫 학원 추가';
-    document.getElementById('deleteAcademyBtn').style.display = 'none';
-    
-    // GPS 및 음성 섹션 숨김 (추가 모드에서는 저장 후에 설정)
-    document.getElementById('gpsSection').style.display = 'none';
-    document.getElementById('voiceSection').style.display = 'none';
-    
-    // 기본값 설정
-    document.getElementById('classTime').value = '16:00';
-    document.getElementById('departureTime').value = '15:30';
-    
-    // 모달 표시
-    document.getElementById('academyModal').style.display = 'flex';
-}
-
-// 학원 수정 모달 열기
-function editAcademy(id) {
-    const academy = state.academies.find(a => a.id === id);
-    if (!academy) return;
-    
-    // 모달 제목 변경
-    document.getElementById('academyModalTitle').textContent = '✏️ 학원 수정';
-    document.getElementById('deleteAcademyBtn').style.display = 'block';
-    document.getElementById('editingAcademyId').value = id;
-    
-    // 기본 정보
-    document.getElementById('academyName').value = academy.name;
-    document.getElementById('academyAddress').value = academy.address || '';
-    
-    // 수업 일정
-    // 요일 체크박스 초기화
-    for (let i = 0; i < 7; i++) {
-        document.getElementById(`day${i}`).checked = false;
-    }
-    // 저장된 요일 체크
-    academy.schedule.forEach(s => {
-        if (s.enabled) {
-            document.getElementById(`day${s.day}`).checked = true;
-        }
-    });
-    
-    // 시간
-    const firstSchedule = academy.schedule.find(s => s.enabled);
-    if (firstSchedule) {
-        document.getElementById('classTime').value = firstSchedule.time;
-    }
-    document.getElementById('departureTime').value = academy.departureTime;
-    
-    // 학원비
-    document.getElementById('academyFee').value = academy.fee || '';
-    document.getElementById('paymentDay').value = academy.paymentDay || '';
-    
-    // 알림 설정
-    document.getElementById('rainAlert').checked = academy.weatherAlerts?.rain || false;
-    document.getElementById('dustAlert').checked = academy.weatherAlerts?.fineDust || false;
-    
-    // GPS 섹션 표시 (수정 모드에서만)
-    document.getElementById('gpsSection').style.display = 'block';
-    document.getElementById('voiceSection').style.display = 'block';
-    
-    // GPS 상태 업데이트
-    if (academy.locationGate) {
-        document.getElementById('gateStatus').textContent = '✅ 설정됨';
-        document.getElementById('gateStatus').style.color = 'var(--success)';
-    } else {
-        document.getElementById('gateStatus').textContent = '미설정';
-        document.getElementById('gateStatus').style.color = 'var(--text-secondary)';
-    }
-    
-    if (academy.locationBus) {
-        document.getElementById('busStatus').textContent = '✅ 설정됨';
-        document.getElementById('busStatus').style.color = 'var(--success)';
-    } else {
-        document.getElementById('busStatus').textContent = '미설정';
-        document.getElementById('busStatus').style.color = 'var(--text-secondary)';
-    }
-    
-    // 음성 메시지 상태 업데이트
-    if (academy.voiceMessage) {
-        document.getElementById('playBtn').style.display = 'block';
-    } else {
-        document.getElementById('playBtn').style.display = 'none';
-    }
-    
-    // 모달 표시
-    document.getElementById('academyModal').style.display = 'flex';
-}
-
-// 학원 모달 닫기
-function closeAcademyModal() {
-    document.getElementById('academyModal').style.display = 'none';
-}
-
-// 학원 저장 (추가 또는 수정)
-function saveAcademy(event) {
-    event.preventDefault();
-    
-    const editingId = document.getElementById('editingAcademyId').value;
-    const name = document.getElementById('academyName').value.trim();
-    const address = document.getElementById('academyAddress').value.trim();
-    const classTime = document.getElementById('classTime').value;
-    const departureTime = document.getElementById('departureTime').value;
-    const fee = parseInt(document.getElementById('academyFee').value) || null;
-    const paymentDay = parseInt(document.getElementById('paymentDay').value) || null;
-    const rainAlert = document.getElementById('rainAlert').checked;
-    const dustAlert = document.getElementById('dustAlert').checked;
-    
-    // 선택된 요일 수집
-    const selectedDays = [];
-    for (let i = 0; i < 7; i++) {
-        const dayCheckbox = document.getElementById(`day${i}`);
-        if (dayCheckbox.checked) {
-            selectedDays.push(i);
-        }
-    }
-    
-    if (selectedDays.length === 0) {
-        alert('수업 요일을 최소 1개 이상 선택해주세요!');
-        return;
-    }
-    
-    // 출발 시간 유효성 검사
-    const classTimeMinutes = convertTimeToMinutes(classTime);
-    const departureTimeMinutes = convertTimeToMinutes(departureTime);
-    
-    if (departureTimeMinutes >= classTimeMinutes) {
-        alert('⚠️ 출발 시간이 수업 시작 시간보다 늦거나 같습니다!\n\n출발 시간은 수업 시작 시간보다 앞서야 합니다.\n\n예시:\n- 수업 시간: 16:30\n- 출발 시간: 16:00 ✅\n- 출발 시간: 16:30 ❌\n- 출발 시간: 16:40 ❌');
-        return;
-    }
-    
-    // 스케줄 생성
-    const schedule = selectedDays.map(day => ({
-        day: day,
-        time: classTime,
-        enabled: true
-    }));
-    
-    if (editingId) {
-        // 수정
-        const academy = state.academies.find(a => a.id === editingId);
-        if (academy) {
-            academy.name = name;
-            academy.address = address;
-            academy.schedule = schedule;
-            academy.departureTime = departureTime;
-            academy.fee = fee;
-            academy.paymentDay = paymentDay;
-            academy.weatherAlerts = {
-                rain: rainAlert,
-                fineDust: dustAlert
-            };
-            academy.updatedAt = new Date().toISOString();
-        }
-    } else {
-        // 추가
-        const newAcademy = {
-            id: generateId(),
-            childId: state.currentChildId,
-            name: name,
-            address: address,
-            schedule: schedule,
-            departureTime: departureTime,
-            fee: fee,
-            paymentDay: paymentDay,
-            locationGate: null,
-            locationBus: null,
-            weatherAlerts: {
-                rain: rainAlert,
-                fineDust: dustAlert
-            },
-            createdAt: new Date().toISOString()
-        };
-        
-        state.academies.push(newAcademy);
-        
-        // 첫 학원 등록 시 무료 체험 시작
-        if (state.academies.length === 1 && state.subscription.status === 'trial' && !state.subscription.trialStartDate) {
-            state.subscription.trialStartDate = new Date().toISOString();
-        }
-    }
-    
-    saveData();
-    render();
-    closeAcademyModal();
-    
-    // 성공 메시지
-    const message = editingId ? '학원이 수정되었습니다! ✏️' : '학원이 추가되었습니다! 🎉';
-    alert(message);
-}
-
-// 학원 삭제
-function deleteCurrentAcademy() {
-    const editingId = document.getElementById('editingAcademyId').value;
-    if (!editingId) return;
-    
-    const academy = state.academies.find(a => a.id === editingId);
-    if (!academy) return;
-    
-    if (confirm(`"${academy.name}" 학원을 삭제하시겠어요?\n이 작업은 되돌릴 수 없습니다.`)) {
-        state.academies = state.academies.filter(a => a.id !== editingId);
-        saveData();
-        render();
-        closeAcademyModal();
-        alert('학원이 삭제되었습니다.');
-    }
-}
-
-function showAddRewardModal() {
-    const name = prompt('보상 이름을 입력하세요: (예: 아이스크림 🍦)');
-    if (!name) return;
-    
-    const points = parseInt(prompt('필요한 포인트를 입력하세요:'));
-    if (!points || points < 1) return;
-    
-    const reward = {
-        id: generateId(),
-        childId: state.currentChildId,
-        name: name.trim(),
-        pointsRequired: points,
-        claimed: false
-    };
-    
-    state.rewards.push(reward);
-    saveData();
-    render();
-}
-
-function showChildrenManagement() {
-    alert('자녀 관리 기능은 개발 중입니다.');
-}
-
-function showSubscriptionModal() {
-    alert('구독 기능은 개발 중입니다.\n\n플랜:\n- 1자녀: 1,000원/월\n- 다자녀: 2,000원/월\n\n결제 수단: 토스페이, 카카오페이');
-}
-
-// 홈 화면 추가 가이드
-function showInstallGuide() {
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isAndroid = /Android/.test(navigator.userAgent);
-    
-    let message = '📱 홈 화면에 추가하기\n\n';
-    
-    if (isIOS) {
-        message += '📱 iPhone/iPad:\n';
-        message += '1️⃣ 하단의 "공유" 버튼 (⬆️) 클릭\n';
-        message += '2️⃣ "홈 화면에 추가" 선택\n';
-        message += '3️⃣ "추가" 버튼 클릭\n';
-    } else if (isAndroid) {
-        message += '📱 Android:\n';
-        message += '1️⃣ 브라우저 메뉴 (⋮) 열기\n';
-        message += '2️⃣ "홈 화면에 추가" 선택\n';
-        message += '3️⃣ "추가" 버튼 클릭\n';
-    } else {
-        message += '💻 데스크톱:\n';
-        message += '1️⃣ 주소창 오른쪽 아이콘 클릭\n';
-        message += '2️⃣ "설치" 버튼 클릭\n';
-    }
-    
-    message += '\n✨ 앱처럼 빠르게 사용하세요!';
-    
-    alert(message);
-}
-
-// ========================================
-// 💌 자녀 메시지 기능
-// ========================================
-
-// 메시지 확인 및 알림 표시
-function checkChildMessages() {
-    const messages = Storage.get('childMessages') || [];
-    const unreadMessages = messages.filter(m => m.childId === state.currentChildId && !m.read);
-    
-    const messageBtn = document.getElementById('messageBtn');
-    const messageCount = document.getElementById('messageCount');
-    
-    if (unreadMessages.length > 0) {
-        messageCount.textContent = unreadMessages.length;
-        messageCount.style.display = 'block';
-    } else {
-        messageCount.style.display = 'none';
-    }
-}
-
-// 자녀 메시지 모달 표시
-function showChildMessages() {
-    const currentChild = getCurrentChild();
-    if (!currentChild) return;
-    
-    document.getElementById('currentChildNameMsg').textContent = currentChild.name;
-    
-    const messages = Storage.get('childMessages') || [];
-    const childMessages = messages
-        .filter(m => m.childId === state.currentChildId)
-        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-    
-    const container = document.getElementById('childMessagesList');
-    
-    if (childMessages.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #999; padding: 40px;">아직 받은 메시지가 없어요</p>';
-    } else {
-        container.innerHTML = childMessages.map(msg => {
-            const date = new Date(msg.timestamp);
-            const timeStr = date.toLocaleString('ko-KR');
-            
-            return `
-                <div class="child-message-item ${msg.read ? 'read' : 'unread'}">
-                    <div class="message-header">
-                        <span class="message-type-icon">${msg.type === 'voice' ? '🎤' : msg.emoji}</span>
-                        <span class="message-time">${timeStr}</span>
-                    </div>
-                    <div class="message-body">
-                        ${msg.type === 'voice' 
-                            ? `<button class="btn-play-msg" onclick="playChildVoice('${msg.id}')">▶️ 음성 메시지 듣기</button>`
-                            : `<p class="message-text">${msg.content}</p>`
-                        }
-                    </div>
-                    ${!msg.read ? '<button class="btn-mark-read" onclick="markMessageRead(\'' + msg.id + '\')">읽음 표시</button>' : ''}
-                </div>
-            `;
-        }).join('');
-    }
-    
-    document.getElementById('childMessagesModal').style.display = 'flex';
-    
-    // 모든 메시지 읽음 처리 (자동)
-    childMessages.forEach(msg => {
-        if (!msg.read) {
-            msg.read = true;
-        }
-    });
-    Storage.set('childMessages', messages);
-    checkChildMessages();
-}
-
-// 자녀 음성 메시지 재생
-function playChildVoice(messageId) {
-    const messages = Storage.get('childMessages') || [];
-    const message = messages.find(m => m.id === messageId);
-    
-    if (!message || !message.content) {
-        alert('음성 메시지를 찾을 수 없어요!');
-        return;
-    }
-    
-    const audio = new Audio(message.content);
-    audio.play();
-}
-
-// 메시지 읽음 표시
-function markMessageRead(messageId) {
-    const messages = Storage.get('childMessages') || [];
-    const message = messages.find(m => m.id === messageId);
-    
-    if (message) {
-        message.read = true;
-        Storage.set('childMessages', messages);
-        showChildMessages(); // 다시 렌더링
-    }
-}
-
-// 자녀 메시지 모달 닫기
-function closeChildMessagesModal() {
-    document.getElementById('childMessagesModal').style.display = 'none';
-}
-
-// ========================================
-// 🌤️ 날씨 API
-// ========================================
-
-const WEATHER_API_KEY = '5c1484b99707cec9adb86ba7cbd7bd0e';
-
-// 날씨 정보 가져오기
-async function getWeather(lat, lon) {
-    try {
-        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric&lang=kr`;
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        return {
-            temp: Math.round(data.main.temp),
-            weather: data.weather[0].main,
-            description: data.weather[0].description,
-            icon: data.weather[0].icon
-        };
-    } catch (error) {
-        console.error('날씨 정보 가져오기 실패:', error);
-        return null;
-    }
-}
-
-// 미세먼지 정보 가져오기
-async function getAirQuality(lat, lon) {
-    try {
-        const url = `https://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        const aqi = data.list[0].main.aqi; // 1~5
-        return {
-            aqi: aqi,
-            level: ['좋음', '보통', '나쁨', '매우 나쁨', '최악'][aqi - 1]
-        };
-    } catch (error) {
-        console.error('미세먼지 정보 가져오기 실패:', error);
-        return null;
-    }
-}
-
-// 날씨 알림 체크
-async function checkWeatherAlerts(academy) {
-    if (!academy.weatherAlerts) return null;
-    
-    // 학원 위치가 있으면 그 위치, 없으면 현재 위치 사용
-    let lat, lon;
-    
-    if (academy.locationGate) {
-        lat = academy.locationGate.lat;
-        lon = academy.locationGate.lon;
-    } else {
-        // 현재 위치 사용
-        const position = await getCurrentPosition();
-        if (!position) return null;
-        lat = position.latitude;
-        lon = position.longitude;
-    }
-    
-    const alerts = [];
-    
-    // 날씨 체크
-    if (academy.weatherAlerts.rain) {
-        const weather = await getWeather(lat, lon);
-        if (weather && (weather.weather === 'Rain' || weather.weather === 'Snow')) {
-            alerts.push({
-                type: 'weather',
-                message: weather.weather === 'Rain' ? '☔ 비가 옵니다! 우산을 챙기세요!' : '❄️ 눈이 옵니다! 따뜻하게 입으세요!',
-                icon: weather.icon
-            });
-        }
-    }
-    
-    // 미세먼지 체크
-    if (academy.weatherAlerts.fineDust) {
-        const airQuality = await getAirQuality(lat, lon);
-        if (airQuality && airQuality.aqi >= 3) { // 나쁨 이상
-            alerts.push({
-                type: 'air',
-                message: `😷 미세먼지가 ${airQuality.level}입니다! 마스크를 챙기세요!`,
-                level: airQuality.level
-            });
-        }
-    }
-    
-    return alerts.length > 0 ? alerts : null;
-}
-
-// ========================================
-// 📍 GPS 위치 관리
-// ========================================
-
-// 현재 위치 가져오기
-function getCurrentPosition() {
-    return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-            reject(new Error('GPS를 지원하지 않는 브라우저입니다.'));
-            return;
-        }
-        
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                resolve({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy
-                });
-            },
-            (error) => {
-                reject(error);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            }
-        );
-    });
-}
-
-// 두 지점 간 거리 계산 (미터)
-function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371e3; // 지구 반지름 (미터)
-    const φ1 = lat1 * Math.PI / 180;
-    const φ2 = lat2 * Math.PI / 180;
-    const Δφ = (lat2 - lat1) * Math.PI / 180;
-    const Δλ = (lon2 - lon1) * Math.PI / 180;
-    
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-              Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    
-    return R * c; // 미터 단위
-}
-
-// 학원 위치 설정
-async function setAcademyLocation(academyId, locationType) {
-    try {
-        const position = await getCurrentPosition();
-        const academy = state.academies.find(a => a.id === academyId);
-        
-        if (!academy) return;
-        
-        if (locationType === 'gate') {
-            academy.locationGate = {
-                lat: position.latitude,
-                lon: position.longitude,
-                accuracy: position.accuracy,
-                setAt: new Date().toISOString()
-            };
-        } else if (locationType === 'bus') {
-            academy.locationBus = {
-                lat: position.latitude,
-                lon: position.longitude,
-                accuracy: position.accuracy,
-                setAt: new Date().toISOString()
-            };
-        }
-        
-        saveData();
-        render(); // UI 업데이트
-        alert('✅ 위치가 저장되었습니다!');
-        
-    } catch (error) {
-        console.error('위치 저장 실패:', error);
-        alert('❌ 위치를 가져올 수 없습니다.\nGPS를 켜주세요.');
-    }
-}
-
-// ========================================
-// 🎤 음성 녹음
-// ========================================
-
-// 음성 녹음 인터페이스 표시
-function showVoiceRecorder(academyId) {
-    if (confirm('🎤 엄마의 따뜻한 응원 메시지를 녹음하시겠어요?\n\n예) "학원 가자! 오늘도 화이팅!"')) {
-        startRecording(academyId);
-        
-        // 녹음 중 안내
-        setTimeout(() => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                if (confirm('🔴 녹음 중입니다...\n\n녹음을 중지하시겠어요?')) {
-                    stopRecording();
-                }
-            }
-        }, 3000); // 3초 후 중지 옵션 제공
-    }
-}
-
-let mediaRecorder = null;
-let audioChunks = [];
-
-// 녹음 시작
-async function startRecording(academyId) {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        audioChunks = [];
-        
-        mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
-        };
-        
-        mediaRecorder.onstop = () => {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-            saveVoiceMessage(academyId, audioBlob);
-            
-            // 스트림 종료
-            stream.getTracks().forEach(track => track.stop());
-        };
-        
-        mediaRecorder.start();
-        
-        // UI 업데이트 (모달 내부에 있는 경우만)
-        const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const indicator = document.getElementById('recordingIndicator');
-        
-        if (recordBtn) recordBtn.style.display = 'none';
-        if (stopBtn) stopBtn.style.display = 'block';
-        if (indicator) indicator.style.display = 'block';
-        
-    } catch (error) {
-        console.error('녹음 시작 실패:', error);
-        alert('❌ 마이크 접근 권한이 필요합니다.');
-    }
-}
-
-// 녹음 중지
-function stopRecording() {
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-        
-        // UI 업데이트 (모달 내부에 있는 경우만)
-        const recordBtn = document.getElementById('recordBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const indicator = document.getElementById('recordingIndicator');
-        
-        if (recordBtn) recordBtn.style.display = 'block';
-        if (stopBtn) stopBtn.style.display = 'none';
-        if (indicator) indicator.style.display = 'none';
-    }
-}
-
-// 음성 메시지 저장
-function saveVoiceMessage(academyId, audioBlob) {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-        const base64Audio = reader.result;
-        
-        const academy = state.academies.find(a => a.id === academyId);
-        if (academy) {
-            academy.voiceMessage = {
-                data: base64Audio,
-                recordedAt: new Date().toISOString()
-            };
-            saveData();
-            render(); // UI 업데이트
-            alert('✅ 엄마 목소리가 저장되었습니다! 💕');
-        }
-    };
-    reader.readAsDataURL(audioBlob);
-}
-
-// 음성 메시지 재생
-function playVoiceMessage(academyId) {
-    const academy = state.academies.find(a => a.id === academyId);
-    if (!academy || !academy.voiceMessage) {
-        alert('저장된 음성 메시지가 없습니다.');
-        return;
-    }
-    
-    const audio = new Audio(academy.voiceMessage.data);
-    audio.play();
-}
-
-// ========================================
-// ✅ 출석 체크
-// ========================================
-
-// 출석 체크 (GPS 기반)
-async function checkAttendance(academyId) {
-    try {
-        const academy = state.academies.find(a => a.id === academyId);
-        if (!academy || !academy.locationGate) {
-            alert('학원 위치가 설정되지 않았습니다.');
-            return;
-        }
-        
-        const currentPosition = await getCurrentPosition();
-        const distance = calculateDistance(
-            currentPosition.latitude,
-            currentPosition.longitude,
-            academy.locationGate.lat,
-            academy.locationGate.lon
-        );
-        
-        // 50미터 이내면 출석 인정
-        if (distance <= 50) {
-            const now = new Date();
-            const arrivalTime = now.toTimeString().split(' ')[0].substring(0, 5);
-            
-            // 포인트 계산
-            const scheduledTime = academy.schedule.find(s => s.day === now.getDay());
-            let points = 0;
-            
-            if (scheduledTime) {
-                const scheduledMinutes = convertTimeToMinutes(scheduledTime.time);
-                const arrivalMinutes = convertTimeToMinutes(arrivalTime);
-                const diff = scheduledMinutes - arrivalMinutes;
-                
-                if (diff >= 10) points = 10; // 10분 일찍
-                else if (diff >= 5) points = 3; // 5분 일찍
-                else if (diff >= 0) points = 2; // 정시
-            }
-            
-            // 출석 기록 저장
-            if (!academy.attendance) academy.attendance = [];
-            academy.attendance.push({
-                date: now.toISOString().split('T')[0],
-                time: arrivalTime,
-                distance: Math.round(distance),
-                points: points
-            });
-            
-            // 포인트 적립
-            const currentChild = getCurrentChild();
-            if (currentChild) {
-                currentChild.totalPoints += points;
-            }
-            
-            saveData();
-            render();
-            
-            // 성공 메시지
-            alert(`🎉 출석 완료!\n\n거리: ${Math.round(distance)}m\n포인트: +${points}P`);
-            
-            // 폭죽 효과 (출석률 달성 시)
-            checkAttendanceRate(academy);
-            
-        } else {
-            alert(`❌ 학원에서 너무 멀어요!\n\n현재 거리: ${Math.round(distance)}m\n(50m 이내에서 출석 가능)`);
-        }
-        
-    } catch (error) {
-        console.error('출석 체크 실패:', error);
-        alert('❌ 위치를 확인할 수 없습니다.');
-    }
-}
-
-// 출석률 체크 및 폭죽 효과
-function checkAttendanceRate(academy) {
-    if (!academy.attendance || academy.attendance.length === 0) return;
-    
-    // 최근 30일 출석률 계산
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const recentAttendance = academy.attendance.filter(a => {
-        const attendanceDate = new Date(a.date);
-        return attendanceDate >= thirtyDaysAgo;
-    });
-    
-    // 예상 출석 횟수 계산 (주당 수업 횟수 * 4주)
-    const weeklyClasses = academy.schedule.filter(s => s.enabled).length;
-    const expectedAttendance = weeklyClasses * 4;
-    
-    const rate = (recentAttendance.length / expectedAttendance) * 100;
-    
-    // 출석률 달성 시 폭죽
-    if (rate >= 100) {
-        showFireworks('🎊 완벽! 100% 출석! 🎊');
-    } else if (rate >= 90) {
-        showFireworks('🎉 대단해! 90% 출석! 🎉');
-    } else if (rate >= 85) {
-        showFireworks('👏 잘했어! 85% 출석! 👏');
-    }
-}
-
-// 폭죽 효과
-function showFireworks(message) {
-    // 간단한 alert로 구현 (나중에 애니메이션 추가 가능)
-    setTimeout(() => {
-        alert(message);
-    }, 500);
-}
-
-// ========================================
-// 🔔 알림 시스템
-// ========================================
-
-// 출발 알림 예약
-function scheduleNotifications() {
-    // 모든 학원의 출발 시간 체크
-    const today = new Date().getDay();
-    const now = new Date();
-    
-    state.academies.forEach(academy => {
-        const todaySchedule = academy.schedule.find(s => s.day === today && s.enabled);
-        if (!todaySchedule) return;
-        
-        // 출발 시간
-        const departureTime = academy.departureTime.split(':');
-        const departureHour = parseInt(departureTime[0]);
-        const departureMinute = parseInt(departureTime[1]);
-        
-        const departureDate = new Date();
-        departureDate.setHours(departureHour, departureMinute, 0);
-        
-        // 이미 지난 시간이면 스킵
-        if (departureDate < now) return;
-        
-        // 알림 예약
-        const timeUntilDeparture = departureDate - now;
-        
-        setTimeout(() => {
-            showNotification(academy);
-        }, timeUntilDeparture);
-    });
-}
-
-// 알림 표시
-async function showNotification(academy) {
-    // 날씨 알림 체크
-    const weatherAlerts = await checkWeatherAlerts(academy);
-    
-    let message = `🏫 ${academy.name}\n⏰ 출발 시간입니다!\n`;
-    
-    if (weatherAlerts) {
-        weatherAlerts.forEach(alert => {
-            message += `\n${alert.message}`;
-        });
-    }
-    
-    // 음성 메시지 재생
-    if (academy.voiceMessage) {
-        playVoiceMessage(academy.id);
-    }
-    
-    // 알림 표시
-    if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('학원가자 알림', {
-            body: message,
-            icon: '/icon-192.png'
-        });
-    } else {
-        alert(message);
-    }
+      const firework = document.createElement('div');
+      firework.className = 'firework';
+      firework.style.left = Math.random() * 100 + '%';
+      firework.style.top = Math.random() * 100 + '%';
+      firework.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+      document.body.appendChild(firework);
+      
+      setTimeout(() => firework.remove(), 1000);
+    }, i * 30);
+  }
 }
 
 // 알림 권한 요청
-function requestNotificationPermission() {
-    if ('Notification' in window) {
-        Notification.requestPermission().then(permission => {
-            if (permission === 'granted') {
-                alert('✅ 알림 권한이 허용되었습니다!');
-            }
-        });
-    }
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
 }
-
-// 앱 시작
-document.addEventListener('DOMContentLoaded', init);
