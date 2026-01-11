@@ -515,8 +515,9 @@
     <!-- Scripts -->
     <script src="app.js"></script>
     
-    <!-- PWA 설치 -->
+    <!-- PWA 설치 - 임시 비활성화 -->
     <script>
+        /*
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('service-worker.js')
@@ -524,6 +525,7 @@
                     .catch(err => console.log('Service Worker 등록 실패:', err));
             });
         }
+        */
     </script>
 </body>
 </html>
