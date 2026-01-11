@@ -595,7 +595,7 @@ function logout() {
 }
 
 // 모달 함수들
-function showAddChildModal() {
+async function showAddChildModal() {
     const name = prompt('자녀 이름을 입력하세요:');
     if (!name) return;
     
@@ -606,6 +606,32 @@ function showAddChildModal() {
         createdAt: new Date().toISOString()
     };
     
+    // Supabase에 저장
+    if (supabaseClient && state.familyId) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('children')
+                .insert([{
+                    id: child.id,
+                    family_id: state.familyId,
+                    name: child.name,
+                    total_points: child.totalPoints
+                }])
+                .select()
+                .single();
+            
+            if (error) {
+                console.error('Supabase 저장 실패:', error);
+                alert('⚠️ 온라인 저장에 실패했어요.\nLocalStorage에만 저장됩니다.');
+            } else {
+                console.log('✅ Supabase 저장 성공:', data);
+            }
+        } catch (error) {
+            console.error('Supabase 에러:', error);
+        }
+    }
+    
+    // LocalStorage에도 저장 (폴백)
     state.children.push(child);
     state.currentChildId = child.id;
     saveData();
